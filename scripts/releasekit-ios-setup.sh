@@ -36,6 +36,9 @@ STATE_STAGE="start"
 
 TMP_DIR=""
 ASC_TMP_P8_PATH=""
+ASC_AUTH_HOME=""
+ASC_AUTH_READY=0
+ASC_AUTH_PROFILE_NAME="ReleaseKit-iOS Setup"
 
 usage() {
   cat <<USAGE
@@ -655,20 +658,11 @@ collect_api_key_inputs() {
 }
 
 run_asc_auth_validate() {
+  ensure_asc_temp_auth
   local err_file="${TMP_DIR}/asc-auth.err"
 
-  if ASC_BYPASS_KEYCHAIN=1 ASC_NO_UPDATE=1 asc auth status \
-      --key-id "${ASC_KEY_ID}" \
-      --issuer-id "${ASC_ISSUER_ID}" \
-      --private-key "${ASC_TMP_P8_PATH}" \
-      --validate > /dev/null 2>"${err_file}"; then
+  if HOME="${ASC_AUTH_HOME}" ASC_BYPASS_KEYCHAIN=1 asc auth status --validate > /dev/null 2>"${err_file}"; then
     return 0
-  fi
-
-  if grep -Eqi 'unknown option|unrecognized option' "${err_file}"; then
-    if ASC_KEY_ID="${ASC_KEY_ID}" ASC_ISSUER_ID="${ASC_ISSUER_ID}" ASC_PRIVATE_KEY_PATH="${ASC_TMP_P8_PATH}" ASC_BYPASS_KEYCHAIN=1 ASC_NO_UPDATE=1 asc auth status --validate > /dev/null 2>"${err_file}"; then
-      return 0
-    fi
   fi
 
   log error "ASC auth validation failed"
@@ -679,6 +673,33 @@ run_asc_auth_validate() {
   fi
 
   die "Could not validate ASC credentials. Check key ID, issuer ID, and private key."
+}
+
+ensure_asc_temp_auth() {
+  if [[ "${ASC_AUTH_READY}" -eq 1 ]]; then
+    return 0
+  fi
+
+  prepare_tmp_dir
+  [[ -n "${ASC_TMP_P8_PATH}" ]] || die "Missing ASC private key path for auth setup."
+
+  ASC_AUTH_HOME="${TMP_DIR}/asc-home"
+  mkdir -p "${ASC_AUTH_HOME}"
+
+  local err_file="${TMP_DIR}/asc-login.err"
+  if ! HOME="${ASC_AUTH_HOME}" ASC_BYPASS_KEYCHAIN=1 asc auth login \
+      --bypass-keychain \
+      --skip-validation \
+      --name "${ASC_AUTH_PROFILE_NAME}" \
+      --key-id "${ASC_KEY_ID}" \
+      --issuer-id "${ASC_ISSUER_ID}" \
+      --private-key "${ASC_TMP_P8_PATH}" > /dev/null 2>"${err_file}"; then
+    log error "Failed to prepare temporary ASC auth profile"
+    sed 's/^/[asc] /' "${err_file}" >&2 || true
+    die "Could not initialize ASC authentication. Check key ID, issuer ID, and private key path."
+  fi
+
+  ASC_AUTH_READY=1
 }
 
 verify_asc_credentials() {
@@ -696,12 +717,18 @@ resolve_app_id_candidates() {
   local bundle_id="$1"
   local apps_json=""
 
-  if ! apps_json="$(ASC_BYPASS_KEYCHAIN=1 ASC_NO_UPDATE=1 asc apps \
-      --key-id "${ASC_KEY_ID}" \
-      --issuer-id "${ASC_ISSUER_ID}" \
-      --private-key "${ASC_TMP_P8_PATH}" \
-      --paginate 2>/dev/null || true)"; then
-    return 1
+  ensure_asc_temp_auth
+
+  apps_json="$(HOME="${ASC_AUTH_HOME}" ASC_BYPASS_KEYCHAIN=1 asc apps list \
+    --bundle-id "${bundle_id}" \
+    --paginate \
+    --output json 2>/dev/null || true)"
+
+  if [[ -z "${apps_json}" ]]; then
+    apps_json="$(HOME="${ASC_AUTH_HOME}" ASC_BYPASS_KEYCHAIN=1 asc apps \
+      --bundle-id "${bundle_id}" \
+      --paginate \
+      --output json 2>/dev/null || true)"
   fi
 
   [[ -n "${apps_json}" ]] || return 1

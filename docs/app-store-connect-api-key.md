@@ -91,14 +91,18 @@ Save this value as GitHub secret `ASC_PRIVATE_KEY_B64`.
 
 ## Validate credentials with `asc`
 
-The setup CLI runs this automatically, but you can verify manually:
+The setup CLI runs this automatically. Manual validation example:
 
 ```bash
-asc auth status \
+asc auth login \
+  --bypass-keychain \
+  --skip-validation \
+  --name "ReleaseKit-iOS Manual Check" \
   --key-id "<ASC_KEY_ID>" \
   --issuer-id "<ASC_ISSUER_ID>" \
-  --private-key "/path/to/AuthKey_<KEYID>.p8" \
-  --validate
+  --private-key "/path/to/AuthKey_<KEYID>.p8"
+
+ASC_BYPASS_KEYCHAIN=1 asc auth status --validate
 ```
 
 If validation fails due to permissions, recreate the key with **Admin** role.
