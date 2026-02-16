@@ -141,24 +141,33 @@ cat > "${export_options_path}" <<EOF
 </plist>
 EOF
 
-extra_args=()
+echo "Archiving scheme '${INPUT_SCHEME}' from workspace '${INPUT_WORKSPACE}'"
 if [[ -n "${INPUT_XCODEBUILD_EXTRA_ARGS:-}" ]]; then
   # shellcheck disable=SC2206
   extra_args=(${INPUT_XCODEBUILD_EXTRA_ARGS})
+  xcodebuild archive \
+    -workspace "${INPUT_WORKSPACE}" \
+    -scheme "${INPUT_SCHEME}" \
+    -configuration "${INPUT_CONFIGURATION}" \
+    -archivePath "${archive_path}" \
+    -allowProvisioningUpdates \
+    -authenticationKeyPath "${private_key_path}" \
+    -authenticationKeyID "${INPUT_ASC_KEY_ID}" \
+    -authenticationKeyIssuerID "${INPUT_ASC_ISSUER_ID}" \
+    DEVELOPMENT_TEAM="${INPUT_ASC_TEAM_ID}" \
+    "${extra_args[@]}"
+else
+  xcodebuild archive \
+    -workspace "${INPUT_WORKSPACE}" \
+    -scheme "${INPUT_SCHEME}" \
+    -configuration "${INPUT_CONFIGURATION}" \
+    -archivePath "${archive_path}" \
+    -allowProvisioningUpdates \
+    -authenticationKeyPath "${private_key_path}" \
+    -authenticationKeyID "${INPUT_ASC_KEY_ID}" \
+    -authenticationKeyIssuerID "${INPUT_ASC_ISSUER_ID}" \
+    DEVELOPMENT_TEAM="${INPUT_ASC_TEAM_ID}"
 fi
-
-echo "Archiving scheme '${INPUT_SCHEME}' from workspace '${INPUT_WORKSPACE}'"
-xcodebuild archive \
-  -workspace "${INPUT_WORKSPACE}" \
-  -scheme "${INPUT_SCHEME}" \
-  -configuration "${INPUT_CONFIGURATION}" \
-  -archivePath "${archive_path}" \
-  -allowProvisioningUpdates \
-  -authenticationKeyPath "${private_key_path}" \
-  -authenticationKeyID "${INPUT_ASC_KEY_ID}" \
-  -authenticationKeyIssuerID "${INPUT_ASC_ISSUER_ID}" \
-  DEVELOPMENT_TEAM="${INPUT_ASC_TEAM_ID}" \
-  "${extra_args[@]}"
 
 echo "Exporting IPA to '${export_path}'"
 xcodebuild -exportArchive \
