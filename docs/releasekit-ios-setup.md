@@ -64,7 +64,7 @@ Optional generated workflows:
 - If not, guide creation with checklist and docs.
 
 5. Credential validation
-- Validate Key ID + Issuer ID + private key via `asc auth status --validate`.
+- Validate Key ID + Issuer ID + private key via an ASC API probe in isolated auth context.
 
 6. Build metadata
 - Prefill workspace/scheme/bundle/team from local project when possible.
@@ -72,6 +72,7 @@ Optional generated workflows:
 
 7. Workflow generation
 - Optional template generation with overwrite protection (`--force`).
+- Uses local repo templates when available, otherwise built-in templates (global install friendly).
 
 8. GitHub sync
 - If `gh` is available and authenticated, optionally write secrets/variable directly.
@@ -79,22 +80,6 @@ Optional generated workflows:
 
 9. Final summary
 - Shows configured values and next actions.
-
-## Resume behavior
-
-Wizard progress is saved in:
-
-```text
-~/.local/state/releasekit-ios-setup/session.json
-```
-
-Rules:
-- Only non-sensitive fields are persisted.
-- Sensitive values are never stored:
-  - `ASC_KEY_ID`
-  - `ASC_ISSUER_ID`
-  - private key content/base64
-- On resume, secret values are requested again.
 
 ## Key options
 

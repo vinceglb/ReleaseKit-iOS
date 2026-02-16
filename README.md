@@ -19,7 +19,7 @@ curl -fsSL https://raw.githubusercontent.com/vinceglb/releasekit-ios/main/script
 releasekit-ios-setup wizard
 ```
 
-The wizard guides step-by-step, auto-prefills from local git/Xcode context, validates ASC credentials, and can resume interrupted setup without persisting secrets.
+The wizard guides step-by-step, auto-prefills from local git/Xcode context, and validates ASC credentials.
 
 ## DX Setup Docs
 
@@ -114,7 +114,7 @@ releasekit-ios-setup version
 - Cloud signing requires an API key with **Admin** role.
 - Generated workflow templates intentionally use `vinceglb/releasekit-ios@main` for simplicity.
 - Tradeoff: `@main` is less reproducible than pinning to a commit SHA.
-- Wizard resume state stores only non-sensitive fields in `~/.local/state/releasekit-ios-setup/session.json`.
+- Workflow generation works from both local repo scripts and globally installed CLI.
 
 ## Troubleshooting
 
