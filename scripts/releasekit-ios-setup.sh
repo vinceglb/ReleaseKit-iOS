@@ -107,7 +107,7 @@ log() {
 log_debug() {
   local message="$1"
   if [[ "${VERBOSE}" -eq 1 ]]; then
-    printf '[debug] %s\n' "${message}"
+    printf '[debug] %s\n' "${message}" >&2
   fi
 }
 
@@ -699,13 +699,18 @@ resolve_app_id_candidates() {
   fi
 
   [[ -n "${apps_json}" ]] || return 1
+  if ! printf '%s' "${apps_json}" | jq -e . >/dev/null 2>&1; then
+    log_debug "ASC apps response is not valid JSON; skipping automatic app ID resolution."
+    log_debug "ASC apps raw output (first 240 chars): $(printf '%s' "${apps_json}" | head -c 240)"
+    return 1
+  fi
 
   printf '%s' "${apps_json}" | jq -r --arg bundle "${bundle_id}" '
     (if type == "array" then . else (.data // .apps // []) end)[]? as $app
     | ($app.attributes.bundleId // $app.bundleId // "") as $bundleId
     | select($bundleId == $bundle)
     | [($app.id // ""), ($app.attributes.name // $app.name // "Unknown"), $bundleId] | @tsv
-  '
+  ' 2>/dev/null
 }
 
 ensure_app_id() {
