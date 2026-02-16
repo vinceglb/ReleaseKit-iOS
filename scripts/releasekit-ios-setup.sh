@@ -356,6 +356,16 @@ cleanup() {
 }
 trap cleanup EXIT
 
+asc_in_isolated_context() {
+  # asc prioritizes repo-local ./.asc/config.json, so run from temp workdir.
+  local workdir="${TMP_DIR}/asc-workdir"
+  mkdir -p "${workdir}"
+  (
+    cd "${workdir}"
+    HOME="${ASC_AUTH_HOME}" ASC_BYPASS_KEYCHAIN=1 "$@"
+  )
+}
+
 prepare_asc_key_path() {
   if [[ -n "${P8_PATH}" ]]; then
     ASC_TMP_P8_PATH="${P8_PATH}"
@@ -660,12 +670,14 @@ collect_api_key_inputs() {
 run_asc_auth_validate() {
   ensure_asc_temp_auth
   local err_file="${TMP_DIR}/asc-auth.err"
+  local out_file="${TMP_DIR}/asc-auth.out"
 
-  if HOME="${ASC_AUTH_HOME}" ASC_BYPASS_KEYCHAIN=1 asc auth status --validate > /dev/null 2>"${err_file}"; then
+  if asc_in_isolated_context asc apps list --limit 1 --output json >"${out_file}" 2>"${err_file}"; then
     return 0
   fi
 
   log error "ASC auth validation failed"
+  sed 's/^/[asc] /' "${out_file}" >&2 || true
   sed 's/^/[asc] /' "${err_file}" >&2 || true
 
   if grep -Eqi 'forbidden|unauthorized|permission' "${err_file}"; then
@@ -687,7 +699,7 @@ ensure_asc_temp_auth() {
   mkdir -p "${ASC_AUTH_HOME}"
 
   local err_file="${TMP_DIR}/asc-login.err"
-  if ! HOME="${ASC_AUTH_HOME}" ASC_BYPASS_KEYCHAIN=1 asc auth login \
+  if ! asc_in_isolated_context asc auth login \
       --bypass-keychain \
       --skip-validation \
       --name "${ASC_AUTH_PROFILE_NAME}" \
@@ -719,13 +731,13 @@ resolve_app_id_candidates() {
 
   ensure_asc_temp_auth
 
-  apps_json="$(HOME="${ASC_AUTH_HOME}" ASC_BYPASS_KEYCHAIN=1 asc apps list \
+  apps_json="$(asc_in_isolated_context asc apps list \
     --bundle-id "${bundle_id}" \
     --paginate \
     --output json 2>/dev/null || true)"
 
   if [[ -z "${apps_json}" ]]; then
-    apps_json="$(HOME="${ASC_AUTH_HOME}" ASC_BYPASS_KEYCHAIN=1 asc apps \
+    apps_json="$(asc_in_isolated_context asc apps \
       --bundle-id "${bundle_id}" \
       --paginate \
       --output json 2>/dev/null || true)"
