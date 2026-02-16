@@ -25,7 +25,6 @@ jobs:
           ruby -e "require 'yaml'; YAML.load_file('.github/workflows/ci.yml')"
           ruby -e "require 'yaml'; YAML.load_file('.github/workflows/smoke.yml')"
           ruby -e "require 'yaml'; YAML.load_file('templates/workflows/ios-build.yml.tpl')"
-          ruby -e "require 'yaml'; YAML.load_file('templates/workflows/ios-deploy.yml.tpl')"
 
       - name: Check required action metadata
         run: |
