@@ -109,10 +109,6 @@ releasekit-ios-setup doctor
 releasekit-ios-setup version
 ```
 
-Legacy aliases are still available for compatibility:
-- `ios-gha-setup` -> `releasekit-ios-setup`
-- `install-ios-gha-setup.sh` -> `install-releasekit-ios-setup.sh`
-
 ## Security Notes
 
 - Cloud signing requires an API key with **Admin** role.

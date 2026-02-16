@@ -3,7 +3,7 @@ set -euo pipefail
 
 REPO="vinceglb/releasekit-ios"
 INSTALL_DIR="${HOME}/.local/bin"
-VERSION="${RELEASEKIT_IOS_SETUP_VERSION:-${IOS_GHA_SETUP_VERSION:-latest}}"
+VERSION="${RELEASEKIT_IOS_SETUP_VERSION:-latest}"
 ASSET_NAME="releasekit-ios-setup.sh"
 CHECKSUM_NAME="releasekit-ios-setup.sh.sha256"
 
@@ -19,7 +19,6 @@ Usage: install-releasekit-ios-setup.sh [--version <latest|tag>]
 
 Environment variables:
   RELEASEKIT_IOS_SETUP_VERSION   Version tag to install (default: latest)
-  IOS_GHA_SETUP_VERSION          Deprecated alias for version selection
 USAGE
       exit 0
       ;;
@@ -110,10 +109,8 @@ fi
 
 mkdir -p "${INSTALL_DIR}"
 install -m 0755 "${ASSET_PATH}" "${INSTALL_DIR}/releasekit-ios-setup"
-ln -sf "${INSTALL_DIR}/releasekit-ios-setup" "${INSTALL_DIR}/ios-gha-setup"
 
 echo "Installed releasekit-ios-setup ${RESOLVED_TAG} to ${INSTALL_DIR}/releasekit-ios-setup"
-echo "Compatibility alias installed: ${INSTALL_DIR}/ios-gha-setup"
 
 case ":${PATH}:" in
   *":${INSTALL_DIR}:"*)

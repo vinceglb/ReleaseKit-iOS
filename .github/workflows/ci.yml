@@ -16,10 +16,8 @@ jobs:
         run: |
           bash -n scripts/install-asc.sh
           bash -n scripts/install-releasekit-ios-setup.sh
-          bash -n scripts/install-ios-gha-setup.sh
           bash -n scripts/run.sh
           bash -n scripts/releasekit-ios-setup.sh
-          bash -n scripts/ios-gha-setup.sh
 
       - name: Validate YAML syntax
         run: |

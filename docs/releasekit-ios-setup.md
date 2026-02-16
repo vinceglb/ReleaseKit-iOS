@@ -149,11 +149,6 @@ releasekit-ios-setup apply \
 releasekit-ios-setup doctor
 ```
 
-## Legacy aliases
-
-- `ios-gha-setup` forwards to `releasekit-ios-setup`
-- `install-ios-gha-setup.sh` forwards to `install-releasekit-ios-setup.sh`
-
 ## Manual fallback mode
 
 If `gh` is missing or unauthenticated, the wizard still completes setup and prints exact values to configure manually in GitHub:
