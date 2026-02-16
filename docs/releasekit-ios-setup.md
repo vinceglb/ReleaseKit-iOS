@@ -44,7 +44,6 @@ GitHub repository variable:
 
 Optional generated workflows:
 - `.github/workflows/ios-build.yml`
-- `.github/workflows/ios-deploy.yml`
 
 ## Wizard flow
 

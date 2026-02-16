@@ -79,7 +79,7 @@ ASC auth options:
   --p8-b64 <value>               Base64-encoded .p8 content
 
 Workflow generation:
-  --write-workflows              Generate ios-build.yml and ios-deploy.yml from templates
+  --write-workflows              Generate ios-build.yml from template
   --runner-label <label>         Runner label in generated workflows (default: macos-14)
   --force                        Overwrite existing generated workflow files
 
@@ -903,125 +903,6 @@ jobs:
           echo "- **ASC Upload ID**: \`${{ steps.ios_upload.outputs.upload_id }}\`" >> "$GITHUB_STEP_SUMMARY"
 EOF
       ;;
-    deploy)
-      cat > "${output_path}" <<'EOF'
-name: iOS Deploy
-
-on:
-  workflow_dispatch:
-    inputs:
-      destination:
-        description: Where to deploy this build
-        required: true
-        default: testflight
-        type: choice
-        options:
-          - testflight
-          - appstore
-      testflight_group:
-        description: TestFlight group name (used only for destination=testflight)
-        required: false
-        default: Internal Testers
-      submit_for_review:
-        description: Submit App Store release for review
-        required: false
-        type: boolean
-        default: false
-
-jobs:
-  build:
-    uses: ./.github/workflows/ios-build.yml
-    secrets: inherit
-
-  deploy:
-    runs-on: __RUNNER_LABEL__
-    timeout-minutes: 60
-    needs: build
-
-    steps:
-      - name: Select Xcode
-        uses: maxim-lobanov/setup-xcode@v1
-        with:
-          xcode-version: "26.2"
-
-      - name: Install asc CLI
-        run: |
-          curl -fsSL https://raw.githubusercontent.com/rudrankriyam/App-Store-Connect-CLI/main/install.sh | bash
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-
-      - name: Configure ASC auth
-        env:
-          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
-          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
-          ASC_PRIVATE_KEY_B64: ${{ secrets.ASC_PRIVATE_KEY_B64 }}
-          ASC_BYPASS_KEYCHAIN: '1'
-        run: |
-          echo "$ASC_PRIVATE_KEY_B64" | base64 --decode > /tmp/AuthKey.p8
-          chmod 600 /tmp/AuthKey.p8
-
-          asc auth login --skip-validation --name "CI" \
-            --key-id "$ASC_KEY_ID" \
-            --issuer-id "$ASC_ISSUER_ID" \
-            --private-key /tmp/AuthKey.p8 \
-            --bypass-keychain
-
-          rm /tmp/AuthKey.p8
-
-      - name: Download IPA artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: Marmalade.ipa
-          path: ./ipa
-
-      - name: Resolve IPA path
-        id: ipa
-        run: |
-          ipa_path=$(find ./ipa -type f -name "*.ipa" -print -quit)
-          if [[ -z "$ipa_path" ]]; then
-            echo "No IPA found in ./ipa"
-            exit 1
-          fi
-          echo "path=$ipa_path" >> "$GITHUB_OUTPUT"
-
-      - name: Deploy to TestFlight
-        if: ${{ inputs.destination == 'testflight' }}
-        env:
-          ASC_BYPASS_KEYCHAIN: '1'
-        run: |
-          asc publish testflight \
-            --app "${{ vars.ASC_APP_ID }}" \
-            --ipa "${{ steps.ipa.outputs.path }}" \
-            --group "${{ inputs.testflight_group }}" \
-            --notify \
-            --wait \
-            --timeout 30m
-
-      - name: Deploy to App Store
-        if: ${{ inputs.destination == 'appstore' }}
-        env:
-          ASC_BYPASS_KEYCHAIN: '1'
-        run: |
-          submit_flag=""
-          if [[ "${{ inputs.submit_for_review }}" == "true" ]]; then
-            submit_flag="--submit --confirm"
-          fi
-
-          asc publish appstore \
-            --app "${{ vars.ASC_APP_ID }}" \
-            --ipa "${{ steps.ipa.outputs.path }}" \
-            $submit_flag \
-            --wait \
-            --timeout 30m
-
-      - name: Deploy summary
-        run: |
-          echo "## iOS Deploy Summary" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "- **Destination**: ${{ inputs.destination }}" >> "$GITHUB_STEP_SUMMARY"
-          echo "- **Artifact**: \`${{ steps.ipa.outputs.path }}\`" >> "$GITHUB_STEP_SUMMARY"
-          echo "- **ASC App ID**: \`${{ vars.ASC_APP_ID }}\`" >> "$GITHUB_STEP_SUMMARY"
-EOF
-      ;;
     *)
       die "Unknown embedded template key: ${template_key}"
       ;;
@@ -1064,24 +945,17 @@ write_workflow_files() {
   local target_dir="$1"
   local workflow_dir="${target_dir}/.github/workflows"
   local build_tpl="${ROOT_DIR}/templates/workflows/ios-build.yml.tpl"
-  local deploy_tpl="${ROOT_DIR}/templates/workflows/ios-deploy.yml.tpl"
   local build_out="${workflow_dir}/ios-build.yml"
-  local deploy_out="${workflow_dir}/ios-deploy.yml"
 
   mkdir -p "${workflow_dir}"
 
   if [[ -f "${build_out}" && "${FORCE}" -ne 1 ]]; then
     die "${build_out} already exists (use --force to overwrite)"
   fi
-  if [[ -f "${deploy_out}" && "${FORCE}" -ne 1 ]]; then
-    die "${deploy_out} already exists (use --force to overwrite)"
-  fi
 
   write_template_with_fallback "build" "${build_tpl}" "${build_out}"
-  write_template_with_fallback "deploy" "${deploy_tpl}" "${deploy_out}"
 
   log write "Wrote ${build_out}"
-  log write "Wrote ${deploy_out}"
   WORKFLOWS_STATUS="written"
 }
 
@@ -1230,19 +1104,11 @@ run_check_mode() {
     fi
 
     local build_file="${target_dir}/.github/workflows/ios-build.yml"
-    local deploy_file="${target_dir}/.github/workflows/ios-deploy.yml"
 
     if [[ -f "${build_file}" ]]; then
       log done "Workflow present: ${build_file}"
     else
       log check "Workflow missing: ${build_file}"
-      missing=1
-    fi
-
-    if [[ -f "${deploy_file}" ]]; then
-      log done "Workflow present: ${deploy_file}"
-    else
-      log check "Workflow missing: ${deploy_file}"
       missing=1
     fi
   fi
@@ -1442,7 +1308,7 @@ collect_and_validate_setup_inputs() {
 
   log check "Step 7/9: Workflow generation choice"
   if [[ "${INTERACTIVE}" -eq 1 && "${WRITE_WORKFLOWS}" -eq 0 ]]; then
-    if prompt_yes_no "Generate iOS build/deploy workflows from templates now?" "n"; then
+    if prompt_yes_no "Generate iOS build workflow from template now?" "n"; then
       WRITE_WORKFLOWS=1
     fi
   fi
