@@ -865,6 +865,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Select Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: "26.2"
+
       - name: ReleaseKit-iOS archive, export, and upload
         id: ios_upload
         uses: vinceglb/releasekit-ios@__ACTION_REF__
@@ -934,6 +939,11 @@ jobs:
     needs: build
 
     steps:
+      - name: Select Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: "26.2"
+
       - name: Install asc CLI
         run: |
           curl -fsSL https://raw.githubusercontent.com/rudrankriyam/App-Store-Connect-CLI/main/install.sh | bash

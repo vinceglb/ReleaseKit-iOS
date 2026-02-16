@@ -44,6 +44,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Select Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: "26.2"
+
       - name: ReleaseKit-iOS archive, export, and upload
         id: ios_upload
         uses: vinceglb/releasekit-ios@__ACTION_REF__
