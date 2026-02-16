@@ -1091,7 +1091,7 @@ set_repo_secret() {
   local name="$1"
   local value="$2"
 
-  printf '%s' "${value}" | gh secret set "${name}" --repo "${REPO}" --body - >/dev/null
+  gh secret set "${name}" --repo "${REPO}" --body "${value}" >/dev/null
   log set "Configured secret ${name}"
 }
 
