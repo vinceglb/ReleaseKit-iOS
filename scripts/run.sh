@@ -28,6 +28,54 @@ decode_base64() {
   fi
 }
 
+pem_private_key_is_valid() {
+  local file_path="$1"
+  [[ -f "${file_path}" ]] || return 1
+  grep -q '^-----BEGIN PRIVATE KEY-----$' "${file_path}" && grep -q '^-----END PRIVATE KEY-----$' "${file_path}"
+}
+
+write_normalized_file() {
+  local input_path="$1"
+  local output_path="$2"
+  LC_ALL=C tr -d '\r' < "${input_path}" > "${output_path}"
+}
+
+prepare_private_key_file() {
+  local input_value="$1"
+  local output_path="$2"
+  local work_dir="$3"
+
+  local decoded_once="${work_dir}/decoded-once.p8"
+  local decoded_twice="${work_dir}/decoded-twice.p8"
+  local raw_pem="${work_dir}/raw-input.p8"
+
+  if printf '%s' "${input_value}" | decode_base64 > "${decoded_once}" 2>/dev/null; then
+    write_normalized_file "${decoded_once}" "${output_path}"
+    if pem_private_key_is_valid "${output_path}"; then
+      return 0
+    fi
+
+    if cat "${decoded_once}" | decode_base64 > "${decoded_twice}" 2>/dev/null; then
+      write_normalized_file "${decoded_twice}" "${output_path}"
+      if pem_private_key_is_valid "${output_path}"; then
+        echo "::warning::asc_private_key_b64 appears to be double-base64-encoded. Please store single-encoded key content." >&2
+        return 0
+      fi
+    fi
+  fi
+
+  if printf '%s' "${input_value}" | grep -q 'BEGIN PRIVATE KEY'; then
+    printf '%s' "${input_value}" > "${raw_pem}"
+    write_normalized_file "${raw_pem}" "${output_path}"
+    if pem_private_key_is_valid "${output_path}"; then
+      echo "::warning::asc_private_key_b64 appears to contain raw PEM text instead of base64. Please store base64-encoded .p8 content." >&2
+      return 0
+    fi
+  fi
+
+  return 1
+}
+
 extract_archive_bundle_id() {
   local archive_path="$1"
   local value=""
@@ -118,8 +166,8 @@ echo "::add-mask::${INPUT_ASC_ISSUER_ID}"
 echo "::add-mask::${INPUT_ASC_PRIVATE_KEY_B64}"
 echo "::add-mask::${INPUT_ASC_TEAM_ID}"
 
-if ! printf '%s' "${INPUT_ASC_PRIVATE_KEY_B64}" | decode_base64 > "${private_key_path}" 2>/dev/null; then
-  fail "Failed to decode asc_private_key_b64 input."
+if ! prepare_private_key_file "${INPUT_ASC_PRIVATE_KEY_B64}" "${private_key_path}" "${tmp_dir}"; then
+  fail "Invalid ASC private key content. Expected base64-encoded .p8 key (single encoding). Example: base64 < AuthKey_XXXX.p8 | tr -d '\\n'"
 fi
 chmod 600 "${private_key_path}"
 
