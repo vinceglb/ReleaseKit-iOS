@@ -155,6 +155,7 @@ tmp_dir="$(mktemp -d "${runner_temp}/releasekit-ios.XXXXXX")"
 private_key_path="${tmp_dir}/AuthKey.p8"
 result_json_path="${tmp_dir}/asc-upload-result.json"
 export_options_path="${tmp_dir}/ExportOptions.plist"
+asc_home="${tmp_dir}/asc-home"
 
 cleanup() {
   rm -rf "${tmp_dir}"
@@ -250,9 +251,26 @@ export ASC_ISSUER_ID="${INPUT_ASC_ISSUER_ID}"
 export ASC_PRIVATE_KEY_PATH="${private_key_path}"
 export ASC_BYPASS_KEYCHAIN=1
 export ASC_NO_UPDATE=1
+mkdir -p "${asc_home}"
 
 if ! command -v asc >/dev/null 2>&1; then
   fail "asc CLI not found in PATH. Ensure install step runs before this script."
+fi
+
+asc_login_err="${tmp_dir}/asc-login.err"
+if ! HOME="${asc_home}" ASC_BYPASS_KEYCHAIN=1 asc auth login \
+    --bypass-keychain \
+    --skip-validation \
+    --name "releasekit-ios-ci" \
+    --key-id "${INPUT_ASC_KEY_ID}" \
+    --issuer-id "${INPUT_ASC_ISSUER_ID}" \
+    --private-key "${private_key_path}" > /dev/null 2> "${asc_login_err}"; then
+  if [[ -s "${asc_login_err}" ]]; then
+    echo "::group::asc auth login output"
+    cat "${asc_login_err}" >&2
+    echo "::endgroup::"
+  fi
+  fail "asc auth login failed. Check asc_key_id, asc_issuer_id, and asc_private_key_b64."
 fi
 
 upload_cmd=(
@@ -268,7 +286,7 @@ if is_true "${INPUT_WAIT_FOR_PROCESSING}"; then
 fi
 
 echo "Uploading IPA with asc"
-if ! "${upload_cmd[@]}" > "${result_json_path}"; then
+if ! HOME="${asc_home}" ASC_BYPASS_KEYCHAIN=1 "${upload_cmd[@]}" > "${result_json_path}"; then
   if [[ -s "${result_json_path}" ]]; then
     echo "::group::asc output"
     cat "${result_json_path}" >&2
