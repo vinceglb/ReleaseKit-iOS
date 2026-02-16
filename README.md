@@ -122,6 +122,7 @@ releasekit-ios-setup version
   - Use an App Store Connect API key with **Admin** role.
 - ASC auth validation failure in setup CLI
   - Re-check Key ID, Issuer ID, and `.p8` content.
+  - Re-run with `releasekit-ios-setup wizard --verbose` for detailed ASC diagnostics.
 - `gh` unavailable or unauthenticated
   - Wizard falls back to manual value output; run `gh auth login` to enable direct sync.
 - Bundle ID mismatch in action runtime

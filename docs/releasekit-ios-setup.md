@@ -112,6 +112,7 @@ Rules:
 - `--write-workflows`
 - `--force`
 - `--non-interactive`
+- `--verbose` (debug traces)
 
 ## Examples
 
@@ -147,6 +148,14 @@ releasekit-ios-setup apply \
 
 ```bash
 releasekit-ios-setup doctor
+```
+
+### Verbose troubleshooting mode
+
+```bash
+releasekit-ios-setup wizard --verbose
+# or
+RELEASEKIT_IOS_SETUP_DEBUG=1 releasekit-ios-setup wizard
 ```
 
 ## Manual fallback mode
