@@ -31,10 +31,6 @@ GH_AUTHENTICATED=0
 GITHUB_SYNC_STATUS="manual"
 WORKFLOWS_STATUS="not requested"
 
-STATE_DIR="${HOME}/.local/state/releasekit-ios-setup"
-STATE_FILE="${STATE_DIR}/session.json"
-STATE_STAGE="start"
-
 TMP_DIR=""
 ASC_TMP_P8_PATH=""
 ASC_AUTH_HOME=""
@@ -254,6 +250,11 @@ confirm_checklist_step() {
 }
 
 print_api_key_creation_guide() {
+  local guide_ref="https://github.com/vinceglb/releasekit-ios/blob/main/docs/app-store-connect-api-key.md"
+  if [[ -f "${ROOT_DIR}/docs/app-store-connect-api-key.md" ]]; then
+    guide_ref="${ROOT_DIR}/docs/app-store-connect-api-key.md"
+  fi
+
   cat <<GUIDE
 [guide] Create an App Store Connect API key with Admin role:
   1) Open App Store Connect: https://appstoreconnect.apple.com/
@@ -263,108 +264,8 @@ print_api_key_creation_guide() {
   5) Download AuthKey_*.p8 (one-time)
 
 Detailed walkthrough with screenshot placeholders:
-  ${ROOT_DIR}/docs/app-store-connect-api-key.md
+  ${guide_ref}
 GUIDE
-}
-
-state_dir_ready() {
-  if mkdir -p "${STATE_DIR}" >/dev/null 2>&1; then
-    return 0
-  fi
-
-  local fallback_dir="${TMPDIR:-/tmp}/releasekit-ios-setup-state"
-  if mkdir -p "${fallback_dir}" >/dev/null 2>&1; then
-    STATE_DIR="${fallback_dir}"
-    STATE_FILE="${STATE_DIR}/session.json"
-    log check "Using fallback state directory: ${STATE_DIR}"
-    return 0
-  fi
-
-  return 1
-}
-
-state_clear() {
-  rm -f "${STATE_FILE}" >/dev/null 2>&1 || true
-}
-
-state_save() {
-  local stage="$1"
-  if ! command -v jq >/dev/null 2>&1; then
-    return 0
-  fi
-  state_dir_ready || return 0
-  jq -n \
-    --arg stage "${stage}" \
-    --arg repo "${REPO}" \
-    --arg repo_dir "${REPO_DIR}" \
-    --arg workspace "${WORKSPACE}" \
-    --arg scheme "${SCHEME}" \
-    --arg bundle_id "${BUNDLE_ID}" \
-    --arg team_id "${TEAM_ID}" \
-    --arg app_id "${APP_ID}" \
-    --arg runner_label "${RUNNER_LABEL}" \
-    --arg action_ref "${ACTION_REF}" \
-    --argjson write_workflows "${WRITE_WORKFLOWS}" \
-    --argjson force "${FORCE}" \
-    '{
-      stage: $stage,
-      repo: $repo,
-      repo_dir: $repo_dir,
-      workspace: $workspace,
-      scheme: $scheme,
-      bundle_id: $bundle_id,
-      team_id: $team_id,
-      app_id: $app_id,
-      runner_label: $runner_label,
-      action_ref: $action_ref,
-      write_workflows: $write_workflows,
-      force: $force,
-      note: "Sensitive values are intentionally not persisted."
-    }' > "${STATE_FILE}"
-  log check "Saved progress to ${STATE_FILE} (stage: ${stage})"
-}
-
-state_load() {
-  if ! command -v jq >/dev/null 2>&1; then
-    return 1
-  fi
-  [[ -f "${STATE_FILE}" ]] || return 1
-
-  REPO="$(jq -r '.repo // ""' "${STATE_FILE}")"
-  REPO_DIR="$(jq -r '.repo_dir // ""' "${STATE_FILE}")"
-  WORKSPACE="$(jq -r '.workspace // ""' "${STATE_FILE}")"
-  SCHEME="$(jq -r '.scheme // ""' "${STATE_FILE}")"
-  BUNDLE_ID="$(jq -r '.bundle_id // ""' "${STATE_FILE}")"
-  TEAM_ID="$(jq -r '.team_id // ""' "${STATE_FILE}")"
-  APP_ID="$(jq -r '.app_id // ""' "${STATE_FILE}")"
-  RUNNER_LABEL="$(jq -r '.runner_label // "macos-14"' "${STATE_FILE}")"
-  ACTION_REF="$(jq -r '.action_ref // "main"' "${STATE_FILE}")"
-  WRITE_WORKFLOWS="$(jq -r '.write_workflows // 0' "${STATE_FILE}")"
-  FORCE="$(jq -r '.force // 0' "${STATE_FILE}")"
-  STATE_STAGE="$(jq -r '.stage // "start"' "${STATE_FILE}")"
-
-  return 0
-}
-
-resume_if_possible() {
-  if [[ "${COMMAND}" != "wizard" || "${INTERACTIVE}" -ne 1 ]]; then
-    return 0
-  fi
-
-  if [[ ! -f "${STATE_FILE}" ]]; then
-    return 0
-  fi
-
-  log check "Found previous setup state at ${STATE_FILE}"
-  if prompt_yes_no "Resume from the last saved step?" "y"; then
-    state_load
-    log done "Resumed from stage: ${STATE_STAGE}"
-    log check "Sensitive values were not restored and will be re-entered"
-  else
-    state_clear
-    STATE_STAGE="start"
-    log check "Discarded previous setup state"
-  fi
 }
 
 prepare_tmp_dir() {
@@ -906,6 +807,244 @@ render_template() {
   rm -f "${output_path}.bak"
 }
 
+write_embedded_template() {
+  local template_key="$1"
+  local output_path="$2"
+
+  case "${template_key}" in
+    build)
+      cat > "${output_path}" <<'EOF'
+name: iOS Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      wait_for_processing:
+        description: Wait for App Store Connect processing before this workflow completes
+        required: false
+        type: boolean
+        default: false
+      asc_version:
+        description: asc CLI version installed by the shared action
+        required: false
+        default: 0.28.8
+  workflow_call:
+    inputs:
+      wait_for_processing:
+        description: Wait for App Store Connect processing before this workflow completes
+        required: false
+        type: boolean
+        default: false
+      asc_version:
+        description: asc CLI version installed by the shared action
+        required: false
+        type: string
+        default: 0.28.8
+    outputs:
+      ipa-artifact-name:
+        description: Uploaded IPA artifact name
+        value: Marmalade.ipa
+
+env:
+  WORKSPACE: __WORKSPACE__
+  SCHEME: __SCHEME__
+  BUNDLE_ID: __BUNDLE_ID__
+  TEAM_ID: __TEAM_ID__
+
+jobs:
+  build:
+    runs-on: __RUNNER_LABEL__
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: ReleaseKit-iOS archive, export, and upload
+        id: ios_upload
+        uses: vinceglb/releasekit-ios@__ACTION_REF__
+        with:
+          workspace: ${{ env.WORKSPACE }}
+          scheme: ${{ env.SCHEME }}
+          app_id: ${{ vars.ASC_APP_ID }}
+          bundle_id: ${{ env.BUNDLE_ID }}
+          asc_key_id: ${{ secrets.ASC_KEY_ID }}
+          asc_issuer_id: ${{ secrets.ASC_ISSUER_ID }}
+          asc_private_key_b64: ${{ secrets.ASC_PRIVATE_KEY_B64 }}
+          asc_team_id: ${{ secrets.ASC_TEAM_ID }}
+          configuration: Release
+          asc_version: ${{ inputs.asc_version }}
+          wait_for_processing: ${{ inputs.wait_for_processing }}
+          poll_interval: 30s
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Marmalade.ipa
+          path: ${{ steps.ios_upload.outputs.ipa_path }}
+          if-no-files-found: error
+
+      - name: Build summary
+        run: |
+          echo "## iOS Build Summary" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Archive Path**: \`${{ steps.ios_upload.outputs.archive_path }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **IPA Path**: \`${{ steps.ios_upload.outputs.ipa_path }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **ASC Upload ID**: \`${{ steps.ios_upload.outputs.upload_id }}\`" >> "$GITHUB_STEP_SUMMARY"
+EOF
+      ;;
+    deploy)
+      cat > "${output_path}" <<'EOF'
+name: iOS Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      destination:
+        description: Where to deploy this build
+        required: true
+        default: testflight
+        type: choice
+        options:
+          - testflight
+          - appstore
+      testflight_group:
+        description: TestFlight group name (used only for destination=testflight)
+        required: false
+        default: Internal Testers
+      submit_for_review:
+        description: Submit App Store release for review
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  build:
+    uses: ./.github/workflows/ios-build.yml
+    secrets: inherit
+
+  deploy:
+    runs-on: __RUNNER_LABEL__
+    timeout-minutes: 60
+    needs: build
+
+    steps:
+      - name: Install asc CLI
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/rudrankriyam/App-Store-Connect-CLI/main/install.sh | bash
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Configure ASC auth
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_PRIVATE_KEY_B64: ${{ secrets.ASC_PRIVATE_KEY_B64 }}
+          ASC_BYPASS_KEYCHAIN: '1'
+        run: |
+          echo "$ASC_PRIVATE_KEY_B64" | base64 --decode > /tmp/AuthKey.p8
+          chmod 600 /tmp/AuthKey.p8
+
+          asc auth login --skip-validation --name "CI" \
+            --key-id "$ASC_KEY_ID" \
+            --issuer-id "$ASC_ISSUER_ID" \
+            --private-key /tmp/AuthKey.p8 \
+            --bypass-keychain
+
+          rm /tmp/AuthKey.p8
+
+      - name: Download IPA artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: Marmalade.ipa
+          path: ./ipa
+
+      - name: Resolve IPA path
+        id: ipa
+        run: |
+          ipa_path=$(find ./ipa -type f -name "*.ipa" -print -quit)
+          if [[ -z "$ipa_path" ]]; then
+            echo "No IPA found in ./ipa"
+            exit 1
+          fi
+          echo "path=$ipa_path" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy to TestFlight
+        if: ${{ inputs.destination == 'testflight' }}
+        env:
+          ASC_BYPASS_KEYCHAIN: '1'
+        run: |
+          asc publish testflight \
+            --app "${{ vars.ASC_APP_ID }}" \
+            --ipa "${{ steps.ipa.outputs.path }}" \
+            --group "${{ inputs.testflight_group }}" \
+            --notify \
+            --wait \
+            --timeout 30m
+
+      - name: Deploy to App Store
+        if: ${{ inputs.destination == 'appstore' }}
+        env:
+          ASC_BYPASS_KEYCHAIN: '1'
+        run: |
+          submit_flag=""
+          if [[ "${{ inputs.submit_for_review }}" == "true" ]]; then
+            submit_flag="--submit --confirm"
+          fi
+
+          asc publish appstore \
+            --app "${{ vars.ASC_APP_ID }}" \
+            --ipa "${{ steps.ipa.outputs.path }}" \
+            $submit_flag \
+            --wait \
+            --timeout 30m
+
+      - name: Deploy summary
+        run: |
+          echo "## iOS Deploy Summary" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Destination**: ${{ inputs.destination }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Artifact**: \`${{ steps.ipa.outputs.path }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **ASC App ID**: \`${{ vars.ASC_APP_ID }}\`" >> "$GITHUB_STEP_SUMMARY"
+EOF
+      ;;
+    *)
+      die "Unknown embedded template key: ${template_key}"
+      ;;
+  esac
+}
+
+write_template_with_fallback() {
+  local template_key="$1"
+  local template_path="$2"
+  local output_path="$3"
+
+  if [[ -f "${template_path}" ]]; then
+    render_template "${template_path}" "${output_path}"
+    return 0
+  fi
+
+  log check "Template file not found at ${template_path}. Using embedded '${template_key}' template."
+  write_embedded_template "${template_key}" "${output_path}"
+
+  local escaped_workspace escaped_scheme escaped_bundle_id escaped_team_id escaped_runner escaped_action_ref
+  escaped_workspace="$(printf '%s' "${WORKSPACE}" | sed 's/[\/&]/\\&/g')"
+  escaped_scheme="$(printf '%s' "${SCHEME}" | sed 's/[\/&]/\\&/g')"
+  escaped_bundle_id="$(printf '%s' "${BUNDLE_ID}" | sed 's/[\/&]/\\&/g')"
+  escaped_team_id="$(printf '%s' "${TEAM_ID}" | sed 's/[\/&]/\\&/g')"
+  escaped_runner="$(printf '%s' "${RUNNER_LABEL}" | sed 's/[\/&]/\\&/g')"
+  escaped_action_ref="$(printf '%s' "${ACTION_REF}" | sed 's/[\/&]/\\&/g')"
+
+  sed -i.bak \
+    -e "s/__WORKSPACE__/${escaped_workspace}/g" \
+    -e "s/__SCHEME__/${escaped_scheme}/g" \
+    -e "s/__BUNDLE_ID__/${escaped_bundle_id}/g" \
+    -e "s/__TEAM_ID__/${escaped_team_id}/g" \
+    -e "s/__RUNNER_LABEL__/${escaped_runner}/g" \
+    -e "s/__ACTION_REF__/${escaped_action_ref}/g" \
+    "${output_path}"
+  rm -f "${output_path}.bak"
+}
+
 write_workflow_files() {
   local target_dir="$1"
   local workflow_dir="${target_dir}/.github/workflows"
@@ -913,9 +1052,6 @@ write_workflow_files() {
   local deploy_tpl="${ROOT_DIR}/templates/workflows/ios-deploy.yml.tpl"
   local build_out="${workflow_dir}/ios-build.yml"
   local deploy_out="${workflow_dir}/ios-deploy.yml"
-
-  [[ -f "${build_tpl}" ]] || die "Missing template: ${build_tpl}"
-  [[ -f "${deploy_tpl}" ]] || die "Missing template: ${deploy_tpl}"
 
   mkdir -p "${workflow_dir}"
 
@@ -926,8 +1062,8 @@ write_workflow_files() {
     die "${deploy_out} already exists (use --force to overwrite)"
   fi
 
-  render_template "${build_tpl}" "${build_out}"
-  render_template "${deploy_tpl}" "${deploy_out}"
+  write_template_with_fallback "build" "${build_tpl}" "${build_out}"
+  write_template_with_fallback "deploy" "${deploy_tpl}" "${deploy_out}"
 
   log write "Wrote ${build_out}"
   log write "Wrote ${deploy_out}"
@@ -1246,14 +1382,6 @@ parse_args() {
   fi
 }
 
-maybe_save_state() {
-  local stage="$1"
-  if [[ "${COMMAND}" == "wizard" ]]; then
-    state_save "${stage}"
-    STATE_STAGE="${stage}"
-  fi
-}
-
 collect_context_defaults() {
   if [[ -z "${REPO}" ]]; then
     REPO="$(detect_current_github_repo || true)"
@@ -1270,13 +1398,11 @@ collect_context_defaults() {
 collect_and_validate_setup_inputs() {
   log check "Step 1/9: Context scan"
   collect_context_defaults
-  maybe_save_state "context"
 
   log check "Step 2/9: Prerequisites"
   if ! check_required_dependencies; then
     die "Install missing dependencies, then rerun ${SCRIPT_NAME} wizard"
   fi
-  maybe_save_state "prerequisites"
 
   log check "Step 3/9: Repository target"
   if [[ "${INTERACTIVE}" -eq 1 ]]; then
@@ -1286,22 +1412,18 @@ collect_and_validate_setup_inputs() {
       fi
     fi
   fi
-  maybe_save_state "repository"
 
   log check "Step 4/9: App Store Connect API key"
   collect_api_key_inputs
-  maybe_save_state "api-key"
 
   log check "Step 5/9: Credential validation"
   verify_asc_credentials
-  maybe_save_state "auth-validated"
 
   log check "Step 6/9: Project build metadata"
   ensure_workspace
   ensure_scheme
   ensure_bundle_and_team
   ensure_app_id
-  maybe_save_state "metadata"
 
   log check "Step 7/9: Workflow generation choice"
   if [[ "${INTERACTIVE}" -eq 1 && "${WRITE_WORKFLOWS}" -eq 0 ]]; then
@@ -1321,7 +1443,6 @@ collect_and_validate_setup_inputs() {
 
     write_workflow_files "${REPO_DIR}"
   fi
-  maybe_save_state "workflows"
 
   log check "Step 8/9: GitHub sync choice"
   update_gh_status
@@ -1349,7 +1470,6 @@ collect_and_validate_setup_inputs() {
     GITHUB_SYNC_STATUS="manual (gh unavailable or unauthenticated)"
     print_manual_values
   fi
-  maybe_save_state "github-sync"
 
   log check "Step 9/9: Final verification"
   log done "Setup values are ready"
@@ -1433,12 +1553,7 @@ main() {
       print_summary
       ;;
     wizard)
-      if command -v jq >/dev/null 2>&1; then
-        resume_if_possible
-      fi
-
       collect_and_validate_setup_inputs
-      state_clear
       print_summary
       ;;
   esac
