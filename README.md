@@ -28,7 +28,7 @@ The wizard guides step-by-step, auto-prefills from local git/Xcode context, and 
 
 ## Requirements
 
-- Runner: `macos-14` (or newer macOS runner with Xcode)
+- Runner: `macos-latest` (or a pinned macOS runner with Xcode)
 - API key with permissions for build upload/provisioning updates
 - For cloud signing/export (`xcodebuild -allowProvisioningUpdates`), API key role must be **Admin**
 - Project configured for automatic signing
@@ -55,7 +55,7 @@ The wizard guides step-by-step, auto-prefills from local git/Xcode context, and 
 | `configuration` | `Release` | Xcode build configuration. |
 | `archive_path` | `${{ runner.temp }}/archive/App.xcarchive` | Output archive path. |
 | `export_path` | `${{ runner.temp }}/export` | Output export directory (contains IPA). |
-| `asc_version` | `0.28.8` | `asc` CLI version to install. |
+| `asc_version` | `latest` | `asc` CLI version to install (optional override). |
 | `wait_for_processing` | `false` | If `true`, waits for ASC build processing. |
 | `poll_interval` | `30s` | Poll interval when waiting. |
 | `xcodebuild_extra_args` | `""` | Extra args appended to `xcodebuild archive`. |
@@ -80,7 +80,7 @@ on:
 
 jobs:
   upload:
-    runs-on: macos-14
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -96,7 +96,6 @@ jobs:
           asc_issuer_id: ${{ secrets.ASC_ISSUER_ID }}
           asc_private_key_b64: ${{ secrets.ASC_PRIVATE_KEY_B64 }}
           asc_team_id: ${{ secrets.ASC_TEAM_ID }}
-          wait_for_processing: "true"
 ```
 
 ## Setup CLI Commands

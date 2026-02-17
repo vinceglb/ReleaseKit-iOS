@@ -23,7 +23,7 @@ ASC_KEY_ID=""
 ASC_ISSUER_ID=""
 P8_PATH=""
 ASC_PRIVATE_KEY_B64=""
-RUNNER_LABEL="macos-14"
+RUNNER_LABEL="macos-latest"
 ACTION_REF="main"
 
 GH_AVAILABLE=0
@@ -80,7 +80,7 @@ ASC auth options:
 
 Workflow generation:
   --write-workflows              Generate ios-build.yml from template
-  --runner-label <label>         Runner label in generated workflows (default: macos-14)
+  --runner-label <label>         Runner label in generated workflows (default: macos-latest)
   --force                        Overwrite existing generated workflow files
 
 Mode and compatibility:
@@ -823,28 +823,7 @@ name: iOS Build
 
 on:
   workflow_dispatch:
-    inputs:
-      wait_for_processing:
-        description: Wait for App Store Connect processing before this workflow completes
-        required: false
-        type: boolean
-        default: false
-      asc_version:
-        description: asc CLI version installed by the shared action
-        required: false
-        default: 0.28.8
   workflow_call:
-    inputs:
-      wait_for_processing:
-        description: Wait for App Store Connect processing before this workflow completes
-        required: false
-        type: boolean
-        default: false
-      asc_version:
-        description: asc CLI version installed by the shared action
-        required: false
-        type: string
-        default: 0.28.8
     outputs:
       ipa-artifact-name:
         description: Uploaded IPA artifact name
@@ -883,8 +862,7 @@ jobs:
           asc_private_key_b64: ${{ secrets.ASC_PRIVATE_KEY_B64 }}
           asc_team_id: ${{ secrets.ASC_TEAM_ID }}
           configuration: Release
-          asc_version: ${{ inputs.asc_version }}
-          wait_for_processing: ${{ inputs.wait_for_processing }}
+          wait_for_processing: "false"
           poll_interval: 30s
 
       - name: Upload IPA artifact

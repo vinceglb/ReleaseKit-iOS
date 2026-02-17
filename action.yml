@@ -40,9 +40,9 @@ inputs:
     required: false
     default: ${{ runner.temp }}/export
   asc_version:
-    description: asc CLI version to install.
+    description: "asc CLI version to install (default: latest)."
     required: false
-    default: 0.28.8
+    default: latest
   wait_for_processing:
     description: Wait for App Store Connect build processing before returning.
     required: false
