@@ -1,5 +1,5 @@
-name: ReleaseKit-iOS
-description: ReleaseKit-iOS action to archive an app, export an IPA, and upload to App Store Connect with asc.
+name: ReleaseKit-iOS Archive
+description: Archive an iOS app and export an IPA.
 author: vinceglb
 
 inputs:
@@ -8,9 +8,6 @@ inputs:
     required: true
   scheme:
     description: Xcode scheme to archive.
-    required: true
-  app_id:
-    description: App Store Connect app ID.
     required: true
   bundle_id:
     description: Expected app bundle identifier.
@@ -25,32 +22,20 @@ inputs:
     description: Base64-encoded contents of the App Store Connect private key (.p8).
     required: true
   asc_team_id:
-    description: Apple Developer Team ID used for signing and export.
+    description: Apple Developer Team ID used for signing/export.
     required: true
   configuration:
     description: Xcode build configuration.
     required: false
     default: Release
   archive_path:
-    description: Output path for the generated .xcarchive.
+    description: Output path for generated .xcarchive.
     required: false
     default: ${{ runner.temp }}/archive/App.xcarchive
   export_path:
     description: Output directory for exported artifacts (.ipa).
     required: false
     default: ${{ runner.temp }}/export
-  asc_version:
-    description: "asc CLI version to install (default: latest)."
-    required: false
-    default: latest
-  wait_for_processing:
-    description: Wait for App Store Connect build processing before returning.
-    required: false
-    default: "false"
-  poll_interval:
-    description: Poll interval for asc wait mode (for example 30s).
-    required: false
-    default: 30s
   xcodebuild_extra_args:
     description: Additional args appended to xcodebuild archive command.
     required: false
@@ -59,37 +44,24 @@ inputs:
 outputs:
   archive_path:
     description: Absolute path to generated .xcarchive.
-    value: ${{ steps.run.outputs.archive_path }}
+    value: ${{ steps.archive.outputs.archive_path }}
   ipa_path:
     description: Absolute path to generated .ipa.
-    value: ${{ steps.run.outputs.ipa_path }}
-  upload_id:
-    description: App Store Connect build upload ID returned by asc.
-    value: ${{ steps.run.outputs.upload_id }}
-  file_id:
-    description: App Store Connect build upload file ID returned by asc.
-    value: ${{ steps.run.outputs.file_id }}
-  asc_result_json:
-    description: Compact JSON response from asc builds upload.
-    value: ${{ steps.run.outputs.asc_result_json }}
+    value: ${{ steps.archive.outputs.ipa_path }}
+  archive_bundle_id:
+    description: Bundle ID extracted from generated archive.
+    value: ${{ steps.archive.outputs.archive_bundle_id }}
 
 runs:
   using: composite
   steps:
-    - name: Install asc CLI
+    - name: Archive and export IPA
+      id: archive
       shell: bash
-      run: ${{ github.action_path }}/scripts/install-asc.sh
-      env:
-        INPUT_ASC_VERSION: ${{ inputs.asc_version }}
-
-    - name: ReleaseKit-iOS archive, export, and upload
-      id: run
-      shell: bash
-      run: ${{ github.action_path }}/scripts/run.sh
+      run: ${{ github.action_path }}/../../scripts/archive.sh
       env:
         INPUT_WORKSPACE: ${{ inputs.workspace }}
         INPUT_SCHEME: ${{ inputs.scheme }}
-        INPUT_APP_ID: ${{ inputs.app_id }}
         INPUT_BUNDLE_ID: ${{ inputs.bundle_id }}
         INPUT_ASC_KEY_ID: ${{ inputs.asc_key_id }}
         INPUT_ASC_ISSUER_ID: ${{ inputs.asc_issuer_id }}
@@ -98,6 +70,4 @@ runs:
         INPUT_CONFIGURATION: ${{ inputs.configuration }}
         INPUT_ARCHIVE_PATH: ${{ inputs.archive_path }}
         INPUT_EXPORT_PATH: ${{ inputs.export_path }}
-        INPUT_WAIT_FOR_PROCESSING: ${{ inputs.wait_for_processing }}
-        INPUT_POLL_INTERVAL: ${{ inputs.poll_interval }}
         INPUT_XCODEBUILD_EXTRA_ARGS: ${{ inputs.xcodebuild_extra_args }}

@@ -1,0 +1,86 @@
+name: ReleaseKit-iOS Upload
+description: Upload an IPA to App Store Connect using asc.
+author: vinceglb
+
+inputs:
+  app_id:
+    description: App Store Connect app ID.
+    required: true
+  asc_key_id:
+    description: App Store Connect API key ID.
+    required: true
+  asc_issuer_id:
+    description: App Store Connect API issuer ID.
+    required: true
+  asc_private_key_b64:
+    description: Base64-encoded contents of the App Store Connect private key (.p8).
+    required: true
+  ipa_path:
+    description: Absolute path to an .ipa file (path mode).
+    required: false
+    default: ""
+  artifact_name:
+    description: Artifact name containing the .ipa (artifact mode).
+    required: false
+    default: ""
+  artifact_download_path:
+    description: Directory used when downloading artifact mode input.
+    required: false
+    default: ${{ runner.temp }}/upload-input
+  asc_version:
+    description: "asc CLI version to install (default: latest)."
+    required: false
+    default: latest
+  wait_for_processing:
+    description: Wait for App Store Connect build processing before returning.
+    required: false
+    default: "false"
+  poll_interval:
+    description: Poll interval for asc wait mode (for example 30s).
+    required: false
+    default: 30s
+
+outputs:
+  ipa_path:
+    description: IPA path used for upload.
+    value: ${{ steps.upload.outputs.ipa_path }}
+  upload_id:
+    description: App Store Connect build upload ID returned by asc.
+    value: ${{ steps.upload.outputs.upload_id }}
+  file_id:
+    description: App Store Connect build upload file ID returned by asc.
+    value: ${{ steps.upload.outputs.file_id }}
+  asc_result_json:
+    description: Compact JSON response from asc builds upload.
+    value: ${{ steps.upload.outputs.asc_result_json }}
+
+runs:
+  using: composite
+  steps:
+    - name: Install asc CLI
+      shell: bash
+      run: ${{ github.action_path }}/../../scripts/install-asc.sh
+      env:
+        INPUT_ASC_VERSION: ${{ inputs.asc_version }}
+
+    - name: Download IPA artifact
+      if: ${{ inputs.artifact_name != '' }}
+      uses: actions/download-artifact@v4
+      with:
+        name: ${{ inputs.artifact_name }}
+        path: ${{ inputs.artifact_download_path }}
+
+    - name: Upload IPA
+      id: upload
+      shell: bash
+      run: ${{ github.action_path }}/../../scripts/upload.sh
+      env:
+        INPUT_APP_ID: ${{ inputs.app_id }}
+        INPUT_ASC_KEY_ID: ${{ inputs.asc_key_id }}
+        INPUT_ASC_ISSUER_ID: ${{ inputs.asc_issuer_id }}
+        INPUT_ASC_PRIVATE_KEY_B64: ${{ inputs.asc_private_key_b64 }}
+        INPUT_IPA_PATH: ${{ inputs.ipa_path }}
+        INPUT_ARTIFACT_NAME: ${{ inputs.artifact_name }}
+        INPUT_ARTIFACT_DOWNLOAD_PATH: ${{ inputs.artifact_download_path }}
+        INPUT_WAIT_FOR_PROCESSING: ${{ inputs.wait_for_processing }}
+        INPUT_POLL_INTERVAL: ${{ inputs.poll_interval }}

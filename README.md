@@ -1,128 +1,191 @@
 # ReleaseKit-iOS
 
-ReleaseKit-iOS is a composite GitHub Action that archives an iOS app, exports an `.ipa`, and uploads it to App Store Connect using [`asc`](https://github.com/rudrankriyam/App-Store-Connect-CLI).
+ReleaseKit-iOS provides two composite GitHub Actions for iOS CI/CD:
+
+- `vinceglb/releasekit-ios/actions/archive` to build, archive, and export an `.ipa`
+- `vinceglb/releasekit-ios/actions/upload` to upload an `.ipa` to App Store Connect with [`asc`](https://github.com/rudrankriyam/App-Store-Connect-CLI)
 
 ## Quick Start (5 minutes)
 
 1. Create an App Store Connect API key (Admin role for cloud signing)
 - Guide: [`docs/app-store-connect-api-key.md`](docs/app-store-connect-api-key.md)
 
-2. Install the setup CLI globally
+2. Install setup CLI
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/vinceglb/releasekit-ios/main/scripts/install-releasekit-ios-setup.sh | sh
 ```
 
-3. Run guided onboarding from your app repository
+3. Run guided onboarding in your app repo
 
 ```bash
 releasekit-ios-setup wizard
 ```
 
-The wizard guides step-by-step, auto-prefills from local git/Xcode context, and validates ASC credentials.
-
 ## DX Setup Docs
 
-- API key creation guide: [`docs/app-store-connect-api-key.md`](docs/app-store-connect-api-key.md)
+- API key guide: [`docs/app-store-connect-api-key.md`](docs/app-store-connect-api-key.md)
 - Setup CLI guide: [`docs/releasekit-ios-setup.md`](docs/releasekit-ios-setup.md)
 
 ## Requirements
 
-- Runner: `macos-latest` (or a pinned macOS runner with Xcode)
+- Runner: `macos-latest` (or pinned macOS runner with Xcode)
 - API key with permissions for build upload/provisioning updates
-- For cloud signing/export (`xcodebuild -allowProvisioningUpdates`), API key role must be **Admin**
+- Cloud signing/export requires API key role **Admin**
 - Project configured for automatic signing
 
-## Inputs
+## Archive Action
 
-### Required
-
-| Name | Description |
-| --- | --- |
-| `workspace` | Path to the `.xcworkspace` file or directory. |
-| `scheme` | Xcode scheme to archive. |
-| `app_id` | App Store Connect app ID. |
-| `bundle_id` | Expected bundle identifier for validation against archive output. |
-| `asc_key_id` | App Store Connect API Key ID. |
-| `asc_issuer_id` | App Store Connect API Issuer ID. |
-| `asc_private_key_b64` | Base64-encoded `.p8` private key content. |
-| `asc_team_id` | Apple Developer Team ID used for signing/export. |
-
-### Optional
-
-| Name | Default | Description |
-| --- | --- | --- |
-| `configuration` | `Release` | Xcode build configuration. |
-| `archive_path` | `${{ runner.temp }}/archive/App.xcarchive` | Output archive path. |
-| `export_path` | `${{ runner.temp }}/export` | Output export directory (contains IPA). |
-| `asc_version` | `latest` | `asc` CLI version to install (optional override). |
-| `wait_for_processing` | `false` | If `true`, waits for ASC build processing. |
-| `poll_interval` | `30s` | Poll interval when waiting. |
-| `xcodebuild_extra_args` | `""` | Extra args appended to `xcodebuild archive`. |
-
-## Outputs
-
-| Name | Description |
-| --- | --- |
-| `archive_path` | Absolute path to generated `.xcarchive`. |
-| `ipa_path` | Absolute path to generated `.ipa`. |
-| `upload_id` | ASC upload ID returned by `asc builds upload`. |
-| `file_id` | ASC upload file ID returned by `asc builds upload`. |
-| `asc_result_json` | Compact JSON output from `asc builds upload`. |
-
-## Usage
+### Usage
 
 ```yaml
-name: Build and Upload iOS
+- name: Archive and export IPA
+  id: ios_archive
+  uses: vinceglb/releasekit-ios/actions/archive@v1
+  with:
+    workspace: ios/App.xcworkspace
+    scheme: App
+    bundle_id: com.example.app
+    asc_key_id: ${{ secrets.ASC_KEY_ID }}
+    asc_issuer_id: ${{ secrets.ASC_ISSUER_ID }}
+    asc_private_key_b64: ${{ secrets.ASC_PRIVATE_KEY_B64 }}
+    asc_team_id: ${{ secrets.ASC_TEAM_ID }}
+```
+
+### Inputs
+
+Required:
+- `workspace`
+- `scheme`
+- `bundle_id`
+- `asc_key_id`
+- `asc_issuer_id`
+- `asc_private_key_b64`
+- `asc_team_id`
+
+Optional:
+- `configuration` (default `Release`)
+- `archive_path` (default `${{ runner.temp }}/archive/App.xcarchive`)
+- `export_path` (default `${{ runner.temp }}/export`)
+- `xcodebuild_extra_args` (default `""`)
+
+### Outputs
+
+- `archive_path`
+- `ipa_path`
+- `archive_bundle_id`
+
+## Upload Action
+
+### Usage (path mode)
+
+```yaml
+- name: Upload IPA from path
+  id: ios_upload
+  uses: vinceglb/releasekit-ios/actions/upload@v1
+  with:
+    app_id: ${{ vars.ASC_APP_ID }}
+    asc_key_id: ${{ secrets.ASC_KEY_ID }}
+    asc_issuer_id: ${{ secrets.ASC_ISSUER_ID }}
+    asc_private_key_b64: ${{ secrets.ASC_PRIVATE_KEY_B64 }}
+    ipa_path: ${{ steps.ios_archive.outputs.ipa_path }}
+    wait_for_processing: "false"
+```
+
+### Usage (artifact mode)
+
+```yaml
+- name: Upload IPA from artifact
+  id: ios_upload
+  uses: vinceglb/releasekit-ios/actions/upload@v1
+  with:
+    app_id: ${{ vars.ASC_APP_ID }}
+    asc_key_id: ${{ secrets.ASC_KEY_ID }}
+    asc_issuer_id: ${{ secrets.ASC_ISSUER_ID }}
+    asc_private_key_b64: ${{ secrets.ASC_PRIVATE_KEY_B64 }}
+    artifact_name: Marmalade.ipa
+    artifact_download_path: ${{ runner.temp }}/releasekit-upload
+    wait_for_processing: "false"
+```
+
+### Inputs
+
+Required:
+- `app_id`
+- `asc_key_id`
+- `asc_issuer_id`
+- `asc_private_key_b64`
+
+Mode inputs (exactly one):
+- `ipa_path`
+- `artifact_name`
+
+Optional:
+- `artifact_download_path` (default `${{ runner.temp }}/upload-input`)
+- `asc_version` (default `latest`)
+- `wait_for_processing` (default `false`)
+- `poll_interval` (default `30s`)
+
+### Outputs
+
+- `ipa_path`
+- `upload_id`
+- `file_id`
+- `asc_result_json`
+
+## Split Workflow Example
+
+```yaml
+name: iOS Build and Upload
 
 on:
   workflow_dispatch:
 
 jobs:
-  upload:
+  archive:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: ReleaseKit-iOS archive, export and upload
-        id: ios_upload
-        uses: vinceglb/releasekit-ios@main
+      - id: ios_archive
+        uses: vinceglb/releasekit-ios/actions/archive@v1
         with:
           workspace: ios/App.xcworkspace
           scheme: App
-          app_id: ${{ vars.ASC_APP_ID }}
           bundle_id: com.example.app
           asc_key_id: ${{ secrets.ASC_KEY_ID }}
           asc_issuer_id: ${{ secrets.ASC_ISSUER_ID }}
           asc_private_key_b64: ${{ secrets.ASC_PRIVATE_KEY_B64 }}
           asc_team_id: ${{ secrets.ASC_TEAM_ID }}
-```
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Marmalade.ipa
+          path: ${{ steps.ios_archive.outputs.ipa_path }}
 
-## Setup CLI Commands
-
-```bash
-releasekit-ios-setup wizard
-releasekit-ios-setup check --repo owner/repo
-releasekit-ios-setup apply --repo owner/repo --workspace ios/App.xcworkspace --scheme App --bundle-id com.example.app --team-id TEAMID --app-id 123456789 --asc-key-id KEYID --asc-issuer-id ISSUER --p8-path ~/AuthKey_KEYID.p8
-releasekit-ios-setup doctor
-releasekit-ios-setup version
+  upload:
+    needs: archive
+    runs-on: macos-latest
+    steps:
+      - id: ios_upload
+        uses: vinceglb/releasekit-ios/actions/upload@v1
+        with:
+          app_id: ${{ vars.ASC_APP_ID }}
+          asc_key_id: ${{ secrets.ASC_KEY_ID }}
+          asc_issuer_id: ${{ secrets.ASC_ISSUER_ID }}
+          asc_private_key_b64: ${{ secrets.ASC_PRIVATE_KEY_B64 }}
+          artifact_name: Marmalade.ipa
+          wait_for_processing: "false"
 ```
 
 ## Security Notes
 
 - Cloud signing requires an API key with **Admin** role.
-- Generated workflow templates intentionally use `vinceglb/releasekit-ios@main` for simplicity.
-- Tradeoff: `@main` is less reproducible than pinning to a commit SHA.
-- Workflow generation works from both local repo scripts and globally installed CLI.
+- Generated templates use `@v1`; pin a full tag/SHA for stricter reproducibility.
 
 ## Troubleshooting
 
 - `Cloud signing permission error`
-  - Use an App Store Connect API key with **Admin** role.
-- ASC auth validation failure in setup CLI
-  - Re-check Key ID, Issuer ID, and `.p8` content.
-  - Re-run with `releasekit-ios-setup wizard --verbose` for detailed ASC diagnostics.
-- `gh` unavailable or unauthenticated
-  - Wizard falls back to manual value output; run `gh auth login` to enable direct sync.
-- Bundle ID mismatch in action runtime
-  - Check `scheme` and `bundle_id` inputs.
+  - Use an API key with **Admin** role.
+- `asc auth login failed`
+  - Re-check Key ID, Issuer ID, and `.p8` content/base64 encoding.
+- Upload mode validation errors
+  - Provide exactly one of `ipa_path` or `artifact_name`.

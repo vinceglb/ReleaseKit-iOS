@@ -44,6 +44,9 @@ GitHub repository variable:
 
 Optional generated workflows:
 - `.github/workflows/ios-build.yml`
+- Generated workflow uses split jobs:
+- `actions/archive` for archive/export
+- `actions/upload` for App Store Connect upload
 
 ## Wizard flow
 

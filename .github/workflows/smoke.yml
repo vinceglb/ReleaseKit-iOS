@@ -7,27 +7,29 @@ on:
         description: Scenario to run.
         type: choice
         required: true
-        default: missing-app-id
+        default: archive-missing-bundle-id
         options:
-          - missing-app-id
-          - invalid-key-b64
-          - happy-path
-          - bundle-mismatch
-          - bad-app-id
+          - archive-missing-bundle-id
+          - archive-invalid-key-b64
+          - upload-missing-source
+          - upload-both-sources
+          - split-happy-path
+          - split-bundle-mismatch
+          - split-bad-app-id
       workspace:
-        description: Workspace path used for E2E scenarios.
+        description: Workspace path used for split E2E scenarios.
         required: false
         default: ""
       scheme:
-        description: Scheme used for E2E scenarios.
+        description: Scheme used for split E2E scenarios.
         required: false
         default: ""
       app_id:
-        description: App Store Connect app ID (for happy-path and mismatch scenarios).
+        description: App Store Connect app ID for split E2E scenarios.
         required: false
         default: ""
       bundle_id:
-        description: Expected bundle ID (for happy-path and bad-app-id scenarios).
+        description: Expected bundle ID for split E2E scenarios.
         required: false
         default: ""
       asc_team_id:
@@ -45,24 +47,26 @@ on:
 
 jobs:
   local-negative-tests:
-    if: ${{ inputs.scenario == 'missing-app-id' || inputs.scenario == 'invalid-key-b64' }}
-    runs-on: macos-14
+    if: ${{ inputs.scenario == 'archive-missing-bundle-id' || inputs.scenario == 'archive-invalid-key-b64' || inputs.scenario == 'upload-missing-source' || inputs.scenario == 'upload-both-sources' }}
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Make fake workspace
-        run: mkdir -p FakeApp.xcworkspace
+      - name: Make local test fixtures
+        run: |
+          mkdir -p FakeApp.xcworkspace
+          mkdir -p "${{ runner.temp }}/upload-fixtures"
+          touch "${{ runner.temp }}/upload-fixtures/Fake.ipa"
 
-      - name: Scenario missing-app-id
-        id: missing_app_id
-        if: ${{ inputs.scenario == 'missing-app-id' }}
+      - name: Scenario archive-missing-bundle-id
+        id: archive_missing_bundle
+        if: ${{ inputs.scenario == 'archive-missing-bundle-id' }}
         continue-on-error: true
-        run: scripts/run.sh
+        run: scripts/archive.sh
         env:
           INPUT_WORKSPACE: FakeApp.xcworkspace
           INPUT_SCHEME: FakeScheme
-          INPUT_APP_ID: ""
-          INPUT_BUNDLE_ID: com.example.app
+          INPUT_BUNDLE_ID: ""
           INPUT_ASC_KEY_ID: KEYID123
           INPUT_ASC_ISSUER_ID: ISSUER123
           INPUT_ASC_PRIVATE_KEY_B64: Zm9v
@@ -70,27 +74,24 @@ jobs:
           INPUT_CONFIGURATION: Release
           INPUT_ARCHIVE_PATH: ${{ runner.temp }}/archive/App.xcarchive
           INPUT_EXPORT_PATH: ${{ runner.temp }}/export
-          INPUT_WAIT_FOR_PROCESSING: "false"
-          INPUT_POLL_INTERVAL: 30s
           INPUT_XCODEBUILD_EXTRA_ARGS: ""
 
-      - name: Assert missing-app-id failed
-        if: ${{ inputs.scenario == 'missing-app-id' }}
+      - name: Assert archive-missing-bundle-id failed
+        if: ${{ inputs.scenario == 'archive-missing-bundle-id' }}
         run: |
-          if [[ "${{ steps.missing_app_id.outcome }}" != "failure" ]]; then
-            echo "Expected missing-app-id scenario to fail."
+          if [[ "${{ steps.archive_missing_bundle.outcome }}" != "failure" ]]; then
+            echo "Expected archive-missing-bundle-id scenario to fail."
             exit 1
           fi
 
-      - name: Scenario invalid-key-b64
-        id: invalid_key
-        if: ${{ inputs.scenario == 'invalid-key-b64' }}
+      - name: Scenario archive-invalid-key-b64
+        id: archive_invalid_key
+        if: ${{ inputs.scenario == 'archive-invalid-key-b64' }}
         continue-on-error: true
-        run: scripts/run.sh
+        run: scripts/archive.sh
         env:
           INPUT_WORKSPACE: FakeApp.xcworkspace
           INPUT_SCHEME: FakeScheme
-          INPUT_APP_ID: "123456789"
           INPUT_BUNDLE_ID: com.example.app
           INPUT_ASC_KEY_ID: KEYID123
           INPUT_ASC_ISSUER_ID: ISSUER123
@@ -99,48 +100,131 @@ jobs:
           INPUT_CONFIGURATION: Release
           INPUT_ARCHIVE_PATH: ${{ runner.temp }}/archive/App.xcarchive
           INPUT_EXPORT_PATH: ${{ runner.temp }}/export
-          INPUT_WAIT_FOR_PROCESSING: "false"
-          INPUT_POLL_INTERVAL: 30s
           INPUT_XCODEBUILD_EXTRA_ARGS: ""
 
-      - name: Assert invalid-key-b64 failed
-        if: ${{ inputs.scenario == 'invalid-key-b64' }}
+      - name: Assert archive-invalid-key-b64 failed
+        if: ${{ inputs.scenario == 'archive-invalid-key-b64' }}
         run: |
-          if [[ "${{ steps.invalid_key.outcome }}" != "failure" ]]; then
-            echo "Expected invalid-key-b64 scenario to fail."
+          if [[ "${{ steps.archive_invalid_key.outcome }}" != "failure" ]]; then
+            echo "Expected archive-invalid-key-b64 scenario to fail."
             exit 1
           fi
 
-  e2e:
-    if: ${{ inputs.scenario == 'happy-path' || inputs.scenario == 'bundle-mismatch' || inputs.scenario == 'bad-app-id' }}
-    runs-on: macos-14
+      - name: Scenario upload-missing-source
+        id: upload_missing_source
+        if: ${{ inputs.scenario == 'upload-missing-source' }}
+        continue-on-error: true
+        run: scripts/upload.sh
+        env:
+          INPUT_APP_ID: "123456789"
+          INPUT_ASC_KEY_ID: KEYID123
+          INPUT_ASC_ISSUER_ID: ISSUER123
+          INPUT_ASC_PRIVATE_KEY_B64: Zm9v
+          INPUT_IPA_PATH: ""
+          INPUT_ARTIFACT_NAME: ""
+          INPUT_ARTIFACT_DOWNLOAD_PATH: ${{ runner.temp }}/upload-fixtures
+          INPUT_WAIT_FOR_PROCESSING: "false"
+          INPUT_POLL_INTERVAL: 30s
+
+      - name: Assert upload-missing-source failed
+        if: ${{ inputs.scenario == 'upload-missing-source' }}
+        run: |
+          if [[ "${{ steps.upload_missing_source.outcome }}" != "failure" ]]; then
+            echo "Expected upload-missing-source scenario to fail."
+            exit 1
+          fi
+
+      - name: Scenario upload-both-sources
+        id: upload_both_sources
+        if: ${{ inputs.scenario == 'upload-both-sources' }}
+        continue-on-error: true
+        run: scripts/upload.sh
+        env:
+          INPUT_APP_ID: "123456789"
+          INPUT_ASC_KEY_ID: KEYID123
+          INPUT_ASC_ISSUER_ID: ISSUER123
+          INPUT_ASC_PRIVATE_KEY_B64: Zm9v
+          INPUT_IPA_PATH: ${{ runner.temp }}/upload-fixtures/Fake.ipa
+          INPUT_ARTIFACT_NAME: Smoke.ipa
+          INPUT_ARTIFACT_DOWNLOAD_PATH: ${{ runner.temp }}/upload-fixtures
+          INPUT_WAIT_FOR_PROCESSING: "false"
+          INPUT_POLL_INTERVAL: 30s
+
+      - name: Assert upload-both-sources failed
+        if: ${{ inputs.scenario == 'upload-both-sources' }}
+        run: |
+          if [[ "${{ steps.upload_both_sources.outcome }}" != "failure" ]]; then
+            echo "Expected upload-both-sources scenario to fail."
+            exit 1
+          fi
+
+  split-archive:
+    if: ${{ inputs.scenario == 'split-happy-path' || inputs.scenario == 'split-bundle-mismatch' || inputs.scenario == 'split-bad-app-id' }}
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Run action (scenario-dependent expectation)
-        id: action_run
+      - name: Run archive action
+        id: archive_step
         continue-on-error: true
-        uses: ./
+        uses: ./actions/archive
         with:
           workspace: ${{ inputs.workspace }}
           scheme: ${{ inputs.scheme }}
-          app_id: ${{ inputs.scenario == 'bad-app-id' && '0000000000' || inputs.app_id }}
-          bundle_id: ${{ inputs.scenario == 'bundle-mismatch' && format('{0}.mismatch', inputs.bundle_id) || inputs.bundle_id }}
+          bundle_id: ${{ inputs.scenario == 'split-bundle-mismatch' && format('{0}.mismatch', inputs.bundle_id) || inputs.bundle_id }}
           asc_key_id: ${{ secrets.ASC_KEY_ID }}
           asc_issuer_id: ${{ secrets.ASC_ISSUER_ID }}
           asc_private_key_b64: ${{ secrets.ASC_PRIVATE_KEY_B64 }}
           asc_team_id: ${{ inputs.asc_team_id }}
           configuration: ${{ inputs.configuration }}
           xcodebuild_extra_args: ${{ inputs.xcodebuild_extra_args }}
-          wait_for_processing: "false"
 
-      - name: Assert scenario result
+      - name: Assert archive scenario result
         run: |
-          outcome="${{ steps.action_run.outcome }}"
+          outcome="${{ steps.archive_step.outcome }}"
           scenario="${{ inputs.scenario }}"
 
-          if [[ "${scenario}" == "happy-path" ]]; then
-            [[ "${outcome}" == "success" ]] || { echo "Happy path should succeed."; exit 1; }
+          if [[ "${scenario}" == "split-bundle-mismatch" ]]; then
+            [[ "${outcome}" == "failure" ]] || { echo "split-bundle-mismatch should fail in archive stage."; exit 1; }
           else
-            [[ "${outcome}" == "failure" ]] || { echo "${scenario} should fail."; exit 1; }
+            [[ "${outcome}" == "success" ]] || { echo "${scenario} should pass archive stage."; exit 1; }
+          fi
+
+      - name: Upload IPA artifact for upload job
+        if: ${{ inputs.scenario != 'split-bundle-mismatch' && steps.archive_step.outcome == 'success' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: Smoke.ipa
+          path: ${{ steps.archive_step.outputs.ipa_path }}
+          if-no-files-found: error
+
+  split-upload:
+    if: ${{ inputs.scenario == 'split-happy-path' || inputs.scenario == 'split-bad-app-id' }}
+    needs: split-archive
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run upload action (artifact mode)
+        id: upload_step
+        continue-on-error: true
+        uses: ./actions/upload
+        with:
+          app_id: ${{ inputs.scenario == 'split-bad-app-id' && '0000000000' || inputs.app_id }}
+          asc_key_id: ${{ secrets.ASC_KEY_ID }}
+          asc_issuer_id: ${{ secrets.ASC_ISSUER_ID }}
+          asc_private_key_b64: ${{ secrets.ASC_PRIVATE_KEY_B64 }}
+          artifact_name: Smoke.ipa
+          artifact_download_path: ${{ runner.temp }}/smoke-upload
+          wait_for_processing: "false"
+
+      - name: Assert upload scenario result
+        run: |
+          outcome="${{ steps.upload_step.outcome }}"
+          scenario="${{ inputs.scenario }}"
+
+          if [[ "${scenario}" == "split-happy-path" ]]; then
+            [[ "${outcome}" == "success" ]] || { echo "split-happy-path should succeed."; exit 1; }
+          else
+            [[ "${outcome}" == "failure" ]] || { echo "split-bad-app-id should fail in upload stage."; exit 1; }
           fi

@@ -16,19 +16,26 @@ jobs:
         run: |
           bash -n scripts/install-asc.sh
           bash -n scripts/install-releasekit-ios-setup.sh
-          bash -n scripts/run.sh
+          bash -n scripts/archive.sh
+          bash -n scripts/upload.sh
+          bash -n scripts/lib/common.sh
           bash -n scripts/releasekit-ios-setup.sh
 
       - name: Validate YAML syntax
         run: |
-          ruby -e "require 'yaml'; YAML.load_file('action.yml')"
+          ruby -e "require 'yaml'; YAML.load_file('actions/archive/action.yml')"
+          ruby -e "require 'yaml'; YAML.load_file('actions/upload/action.yml')"
           ruby -e "require 'yaml'; YAML.load_file('.github/workflows/ci.yml')"
           ruby -e "require 'yaml'; YAML.load_file('.github/workflows/smoke.yml')"
           ruby -e "require 'yaml'; YAML.load_file('templates/workflows/ios-build.yml.tpl')"
 
       - name: Check required action metadata
         run: |
-          grep -q '^runs:' action.yml
-          grep -q 'using: composite' action.yml
-          grep -q '^inputs:' action.yml
-          grep -q '^outputs:' action.yml
+          grep -q '^runs:' actions/archive/action.yml
+          grep -q 'using: composite' actions/archive/action.yml
+          grep -q '^inputs:' actions/archive/action.yml
+          grep -q '^outputs:' actions/archive/action.yml
+          grep -q '^runs:' actions/upload/action.yml
+          grep -q 'using: composite' actions/upload/action.yml
+          grep -q '^inputs:' actions/upload/action.yml
+          grep -q '^outputs:' actions/upload/action.yml
