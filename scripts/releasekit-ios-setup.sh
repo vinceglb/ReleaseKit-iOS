@@ -242,13 +242,6 @@ prompt_value() {
   done
 }
 
-confirm_checklist_step() {
-  local prompt_label="$1"
-  while ! prompt_yes_no "${prompt_label}" "y"; do
-    printf '[guide] Complete the step first, then confirm to continue.\n'
-  done
-}
-
 print_api_key_creation_guide() {
   local guide_ref="https://github.com/vinceglb/releasekit-ios/blob/main/docs/app-store-connect-api-key.md"
   if [[ -f "${ROOT_DIR}/docs/app-store-connect-api-key.md" ]]; then
@@ -563,11 +556,7 @@ collect_api_key_inputs() {
   if [[ -z "${ASC_KEY_ID}" && -z "${ASC_ISSUER_ID}" && -z "${P8_PATH}" && -z "${ASC_PRIVATE_KEY_B64}" ]]; then
     if ! prompt_yes_no "Do you already have an App Store Connect API key with Admin role?" "y"; then
       print_api_key_creation_guide
-      confirm_checklist_step "Did you open Users and Access in App Store Connect?"
-      confirm_checklist_step "Did you open Integrations > App Store Connect API?"
-      confirm_checklist_step "Did you generate a new API key with role Admin?"
-      confirm_checklist_step "Did you copy Key ID and Issuer ID?"
-      confirm_checklist_step "Did you download the .p8 file?"
+      log check "When ready, enter Key ID, Issuer ID, and your .p8 key details below."
     fi
   fi
 
@@ -1297,13 +1286,11 @@ collect_and_validate_setup_inputs() {
     die "Install missing dependencies, then rerun ${SCRIPT_NAME} wizard"
   fi
 
-  log check "Step 3/9: Repository target"
-  if [[ "${INTERACTIVE}" -eq 1 ]]; then
-    if [[ -n "${REPO}" ]]; then
-      if ! prompt_yes_no "Use repository '${REPO}' for potential GitHub sync?" "y"; then
-        REPO=""
-      fi
-    fi
+  log check "Step 3/9: Repository context"
+  if [[ -n "${REPO}" ]]; then
+    log done "Detected repository for optional GitHub sync: ${REPO}"
+  else
+    log check "No GitHub repo detected. Repository will be requested only if GitHub sync is selected."
   fi
 
   log check "Step 4/9: App Store Connect API key"

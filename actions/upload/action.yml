@@ -58,10 +58,9 @@ runs:
   using: composite
   steps:
     - name: Install asc CLI
-      shell: bash
-      run: ${{ github.action_path }}/../../scripts/install-asc.sh
-      env:
-        INPUT_ASC_VERSION: ${{ inputs.asc_version }}
+      uses: rudrankriyam/setup-asc@v1
+      with:
+        version: ${{ inputs.asc_version }}
 
     - name: Download IPA artifact
       if: ${{ inputs.artifact_name != '' }}

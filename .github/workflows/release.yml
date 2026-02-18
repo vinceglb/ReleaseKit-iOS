@@ -1,0 +1,93 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Validate tag and derive release metadata
+        id: validate_tag
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          TAG="${GITHUB_REF_NAME}"
+          if [[ ! "${TAG}" =~ ^v([0-9]+)\.([0-9]+)([-+].*)?$ ]]; then
+            echo "Tag must match vX.Y with optional prerelease/build suffix. Got: ${TAG}" >&2
+            exit 1
+          fi
+
+          version="${TAG#v}"
+          major="${BASH_REMATCH[1]}"
+          suffix="${BASH_REMATCH[3]:-}"
+          is_prerelease="false"
+          if [[ "${suffix}" == -* ]]; then
+            is_prerelease="true"
+          fi
+
+          echo "version=${version}" >> "${GITHUB_OUTPUT}"
+          echo "major=${major}" >> "${GITHUB_OUTPUT}"
+          echo "is_prerelease=${is_prerelease}" >> "${GITHUB_OUTPUT}"
+
+      - name: Prepare release assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          scripts/prepare-releasekit-ios-setup-release.sh --tag "${GITHUB_REF_NAME}"
+
+      - name: Verify generated assets and CLI version
+        shell: bash
+        env:
+          EXPECTED_VERSION: ${{ steps.validate_tag.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          script_path="release-assets/releasekit-ios-setup.sh"
+          checksum_path="release-assets/releasekit-ios-setup.sh.sha256"
+
+          [[ -f "${script_path}" ]] || { echo "Missing asset: ${script_path}" >&2; exit 1; }
+          [[ -f "${checksum_path}" ]] || { echo "Missing asset: ${checksum_path}" >&2; exit 1; }
+
+          asset_cli_version="$(sed -nE 's/^CLI_VERSION=\"([^\"]+)\"$/\1/p' "${script_path}" | head -n 1)"
+          [[ -n "${asset_cli_version}" ]] || { echo "Could not extract CLI_VERSION from ${script_path}" >&2; exit 1; }
+
+          if [[ "${asset_cli_version}" != "${EXPECTED_VERSION}" ]]; then
+            echo "CLI_VERSION mismatch. Expected ${EXPECTED_VERSION}, got ${asset_cli_version}" >&2
+            exit 1
+          fi
+
+      - name: Create or update GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          generate_release_notes: true
+          prerelease: ${{ steps.validate_tag.outputs.is_prerelease == 'true' }}
+          files: |
+            release-assets/releasekit-ios-setup.sh
+            release-assets/releasekit-ios-setup.sh.sha256
+          fail_on_unmatched_files: true
+          append_body: false
+
+      - name: Update floating major tag
+        if: ${{ steps.validate_tag.outputs.is_prerelease != 'true' }}
+        uses: anothrNick/github-tag-action@1.75.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CUSTOM_TAG: v${{ steps.validate_tag.outputs.major }}
+          GIT_API_TAGGING: "false"
+          BRANCH_HISTORY: "last"

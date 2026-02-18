@@ -181,6 +181,28 @@ jobs:
 - Cloud signing requires an API key with **Admin** role.
 - Generated templates use `@v1`; pin a full tag/SHA for stricter reproducibility.
 
+## Publishing a Release
+
+1. Create and push a `vX.Y` tag.
+2. The `Release` workflow publishes:
+   - `release-assets/releasekit-ios-setup.sh`
+   - `release-assets/releasekit-ios-setup.sh.sha256`
+   - A GitHub Release with auto-generated notes
+3. Stable tags (for example `v1.2`) also move the floating major tag (`v1`). Prereleases (for example `v1.2-rc.1`) do not move the major tag.
+
+## CLI Release Process
+
+To avoid version drift between release tag and `CLI_VERSION`, always prepare assets with:
+
+```bash
+scripts/prepare-releasekit-ios-setup-release.sh --tag vX.Y
+```
+
+This command:
+- Stamps `CLI_VERSION` in `scripts/releasekit-ios-setup.sh`
+- Regenerates `release-assets/releasekit-ios-setup.sh`
+- Regenerates `release-assets/releasekit-ios-setup.sh.sha256`
+
 ## Troubleshooting
 
 - `Cloud signing permission error`

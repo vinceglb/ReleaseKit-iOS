@@ -107,6 +107,20 @@ if [[ "${EXPECTED_SHA}" != "${ACTUAL_SHA}" ]]; then
   exit 1
 fi
 
+EXPECTED_CLI_VERSION="${RESOLVED_TAG#v}"
+ASSET_CLI_VERSION="$(sed -nE 's/^CLI_VERSION=\"([^\"]+)\"$/\1/p' "${ASSET_PATH}" | head -n 1)"
+if [[ -z "${ASSET_CLI_VERSION}" ]]; then
+  echo "Could not extract CLI_VERSION from ${ASSET_NAME}" >&2
+  exit 1
+fi
+if [[ "${ASSET_CLI_VERSION}" != "${EXPECTED_CLI_VERSION}" ]]; then
+  echo "Release asset version mismatch." >&2
+  echo "Tag: ${RESOLVED_TAG} (expected CLI_VERSION=${EXPECTED_CLI_VERSION})" >&2
+  echo "Asset CLI_VERSION: ${ASSET_CLI_VERSION}" >&2
+  echo "Regenerate release assets with scripts/prepare-releasekit-ios-setup-release.sh --tag ${RESOLVED_TAG}" >&2
+  exit 1
+fi
+
 mkdir -p "${INSTALL_DIR}"
 install -m 0755 "${ASSET_PATH}" "${INSTALL_DIR}/releasekit-ios-setup"
 

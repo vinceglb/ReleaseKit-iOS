@@ -63,7 +63,7 @@ Optional generated workflows:
 
 4. API key path
 - Ask whether you already have an Admin API key.
-- If not, guide creation with checklist and docs.
+- If not, show guided creation docs and then collect key values directly.
 
 5. Credential validation
 - Validate Key ID + Issuer ID + private key via an ASC API probe in isolated auth context.
