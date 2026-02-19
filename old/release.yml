@@ -1,0 +1,21 @@
+name: Release (Legacy Setup Frozen)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  legacy-release-frozen:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Legacy setup release is frozen
+        run: |
+          cat <<MSG
+          The legacy release workflow for releasekit-ios-setup is frozen.
+          Stable v* tags now publish the Go CLI binaries via:
+            .github/workflows/release-cli-beta.yml
+
+          Legacy files remain in the repository for reference and migration support.
+          MSG
