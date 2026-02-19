@@ -31,6 +31,20 @@ releasekit-ios-setup wizard
 5. `releasekit-ios-setup version`
 - Prints CLI version
 
+## Auto update notice
+
+On startup, the CLI checks whether a newer stable release is available and prints a single-line notice when your installed version is older.
+
+- Runs for all commands except `version` and `--help`
+- Uses a local cache with a 24-hour default TTL to avoid repeated network calls
+- Never fails command execution if update check fails (network/API issues are ignored)
+
+Environment toggles:
+
+- `RELEASEKIT_IOS_SETUP_NO_UPDATE_CHECK=1`
+- `RELEASEKIT_IOS_SETUP_UPDATE_CHECK_TTL_SECONDS=<seconds>`
+- `RELEASEKIT_IOS_SETUP_UPDATE_API_URL=<url>`
+
 ## What it configures
 
 GitHub repository secrets:

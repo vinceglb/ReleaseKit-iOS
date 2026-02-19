@@ -5,6 +5,9 @@ SCRIPT_NAME="$(basename "$0")"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 CLI_VERSION="0.4.0"
+UPDATE_CHECK_TTL_SECONDS_DEFAULT=86400
+UPDATE_API_URL_DEFAULT="https://api.github.com/repos/vinceglb/releasekit-ios/releases/latest"
+UPDATE_INSTALL_COMMAND="curl -fsSL https://raw.githubusercontent.com/vinceglb/releasekit-ios/main/scripts/install-releasekit-ios-setup.sh | sh"
 
 COMMAND="wizard"
 INTERACTIVE=1
@@ -170,6 +173,210 @@ encode_file_base64() {
 validate_repo_value() {
   local repo_value="$1"
   [[ -n "${repo_value}" && "${repo_value}" =~ ^[^/]+/[^/]+$ ]]
+}
+
+update_cache_dir() {
+  local base_cache_dir="${XDG_CACHE_HOME:-${HOME:-/tmp}/.cache}"
+  printf '%s\n' "${base_cache_dir}/releasekit-ios-setup"
+}
+
+update_cache_file() {
+  printf '%s/update-check.json\n' "$(update_cache_dir)"
+}
+
+now_epoch() {
+  date +%s 2>/dev/null || printf '0\n'
+}
+
+update_check_ttl_seconds() {
+  local ttl="${RELEASEKIT_IOS_SETUP_UPDATE_CHECK_TTL_SECONDS:-${UPDATE_CHECK_TTL_SECONDS_DEFAULT}}"
+  if [[ "${ttl}" =~ ^[0-9]+$ ]]; then
+    printf '%s\n' "${ttl}"
+  else
+    printf '%s\n' "${UPDATE_CHECK_TTL_SECONDS_DEFAULT}"
+  fi
+}
+
+escape_json_string() {
+  local value="$1"
+  value="${value//\\/\\\\}"
+  value="${value//\"/\\\"}"
+  printf '%s' "${value}"
+}
+
+read_cached_latest_tag() {
+  local cache_file="$1"
+  [[ -f "${cache_file}" ]] || return 1
+
+  local checked_at latest_tag now ttl
+  checked_at="$(sed -nE 's/.*"checked_at_epoch"[[:space:]]*:[[:space:]]*([0-9]+).*/\1/p' "${cache_file}" | head -n 1)"
+  latest_tag="$(sed -nE 's/.*"latest_tag"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/p' "${cache_file}" | head -n 1)"
+
+  [[ "${checked_at}" =~ ^[0-9]+$ ]] || return 1
+  [[ -n "${latest_tag}" ]] || return 1
+
+  now="$(now_epoch)"
+  [[ "${now}" =~ ^[0-9]+$ ]] || return 1
+  ttl="$(update_check_ttl_seconds)"
+
+  if (( now - checked_at <= ttl )); then
+    printf '%s\n' "${latest_tag}"
+    return 0
+  fi
+
+  return 1
+}
+
+write_cached_latest_tag() {
+  local cache_file="$1"
+  local latest_tag="$2"
+  local cache_dir tmp_file checked_at escaped_tag
+
+  cache_dir="$(dirname "${cache_file}")"
+  mkdir -p "${cache_dir}" 2>/dev/null || return 1
+
+  checked_at="$(now_epoch)"
+  [[ "${checked_at}" =~ ^[0-9]+$ ]] || return 1
+
+  escaped_tag="$(escape_json_string "${latest_tag}")"
+  tmp_file="${cache_file}.tmp.$$"
+
+  if ! printf '{"checked_at_epoch":%s,"latest_tag":"%s"}\n' "${checked_at}" "${escaped_tag}" > "${tmp_file}"; then
+    rm -f "${tmp_file}"
+    return 1
+  fi
+
+  if ! mv "${tmp_file}" "${cache_file}" 2>/dev/null; then
+    rm -f "${tmp_file}"
+    return 1
+  fi
+
+  return 0
+}
+
+fetch_latest_release_tag() {
+  command -v curl >/dev/null 2>&1 || return 1
+
+  local api_url release_json latest_tag
+  api_url="${RELEASEKIT_IOS_SETUP_UPDATE_API_URL:-${UPDATE_API_URL_DEFAULT}}"
+  release_json="$(curl -fsSL --connect-timeout 2 --max-time 4 "${api_url}" 2>/dev/null || true)"
+  [[ -n "${release_json}" ]] || return 1
+
+  if command -v jq >/dev/null 2>&1; then
+    latest_tag="$(printf '%s' "${release_json}" | jq -r '.tag_name // empty' 2>/dev/null | head -n 1)"
+  else
+    latest_tag="$(printf '%s' "${release_json}" | sed -nE 's/.*"tag_name"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/p' | head -n 1)"
+  fi
+
+  [[ -n "${latest_tag}" ]] || return 1
+  printf '%s\n' "${latest_tag}"
+}
+
+normalize_release_version() {
+  local value="$1"
+  value="${value#v}"
+  value="${value%%+*}"
+  printf '%s\n' "${value}"
+}
+
+compare_versions() {
+  local local_raw="$1"
+  local remote_raw="$2"
+  local local_version remote_version local_core remote_core local_pre remote_pre
+
+  local_version="$(normalize_release_version "${local_raw}")"
+  remote_version="$(normalize_release_version "${remote_raw}")"
+
+  [[ "${local_version}" =~ ^[0-9]+(\.[0-9]+)*([\-][0-9A-Za-z.]+)?$ ]] || {
+    printf 'unparseable\n'
+    return 0
+  }
+  [[ "${remote_version}" =~ ^[0-9]+(\.[0-9]+)*([\-][0-9A-Za-z.]+)?$ ]] || {
+    printf 'unparseable\n'
+    return 0
+  }
+
+  local_core="${local_version%%-*}"
+  remote_core="${remote_version%%-*}"
+  local_pre=""
+  remote_pre=""
+
+  if [[ "${local_version}" == *-* ]]; then
+    local_pre="${local_version#*-}"
+  fi
+  if [[ "${remote_version}" == *-* ]]; then
+    remote_pre="${remote_version#*-}"
+  fi
+
+  local local_parts remote_parts
+  local IFS='.'
+  read -r -a local_parts <<< "${local_core}"
+  read -r -a remote_parts <<< "${remote_core}"
+
+  local max_parts i local_part remote_part
+  max_parts="${#local_parts[@]}"
+  if (( ${#remote_parts[@]} > max_parts )); then
+    max_parts="${#remote_parts[@]}"
+  fi
+
+  for ((i = 0; i < max_parts; i++)); do
+    local_part="${local_parts[i]:-0}"
+    remote_part="${remote_parts[i]:-0}"
+
+    if (( 10#${local_part} < 10#${remote_part} )); then
+      printf 'remote_newer\n'
+      return 0
+    fi
+    if (( 10#${local_part} > 10#${remote_part} )); then
+      printf 'local_newer\n'
+      return 0
+    fi
+  done
+
+  if [[ -n "${local_pre}" && -z "${remote_pre}" ]]; then
+    printf 'remote_newer\n'
+    return 0
+  fi
+  if [[ -z "${local_pre}" && -n "${remote_pre}" ]]; then
+    printf 'local_newer\n'
+    return 0
+  fi
+
+  printf 'equal\n'
+}
+
+maybe_print_update_notice() {
+  local disable_check
+  disable_check="$(normalize_truthy_flag "${RELEASEKIT_IOS_SETUP_NO_UPDATE_CHECK:-0}")"
+  if [[ "${disable_check}" -eq 1 ]]; then
+    return 0
+  fi
+
+  if [[ "${COMMAND}" == "version" ]]; then
+    return 0
+  fi
+
+  local cache_file latest_tag compare_result latest_version
+  cache_file="$(update_cache_file)"
+
+  latest_tag="$(read_cached_latest_tag "${cache_file}" || true)"
+  if [[ -z "${latest_tag}" ]]; then
+    latest_tag="$(fetch_latest_release_tag || true)"
+    if [[ -n "${latest_tag}" ]]; then
+      write_cached_latest_tag "${cache_file}" "${latest_tag}" || true
+    else
+      return 0
+    fi
+  fi
+
+  compare_result="$(compare_versions "${CLI_VERSION}" "${latest_tag}")"
+  if [[ "${compare_result}" != "remote_newer" ]]; then
+    return 0
+  fi
+
+  latest_version="$(normalize_release_version "${latest_tag}")"
+  printf '[check] A newer releasekit-ios-setup is available: %s (you have %s). Update: %s\n' \
+    "${latest_version}" "${CLI_VERSION}" "${UPDATE_INSTALL_COMMAND}" >&2
 }
 
 prompt_yes_no() {
@@ -1410,6 +1617,7 @@ SUMMARY
 
 main() {
   parse_args "$@"
+  maybe_print_update_notice
 
   if [[ "${COMMAND}" == "version" ]]; then
     printf '%s\n' "${CLI_VERSION}"
