@@ -89,7 +89,13 @@ if is_true "${INPUT_WAIT_FOR_PROCESSING}"; then
 fi
 
 echo "Uploading IPA with asc"
-if ! HOME="${asc_home}" ASC_BYPASS_KEYCHAIN=1 "${upload_cmd[@]}" > "${result_json_path}"; then
+if ! env \
+    HOME="${asc_home}" \
+    ASC_BYPASS_KEYCHAIN=1 \
+    ASC_KEY_ID="${INPUT_ASC_KEY_ID}" \
+    ASC_ISSUER_ID="${INPUT_ASC_ISSUER_ID}" \
+    ASC_PRIVATE_KEY_PATH="${private_key_path}" \
+    "${upload_cmd[@]}" > "${result_json_path}"; then
   if [[ -s "${result_json_path}" ]]; then
     echo "::group::asc output"
     cat "${result_json_path}" >&2

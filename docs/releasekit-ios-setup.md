@@ -44,7 +44,7 @@ GitHub repository variables:
 - `BUNDLE_ID`
 
 Optional generated workflows:
-- `.github/workflows/ios-build.yml`
+- `.github/workflows/ios-release.yml`
 - Generated workflow uses split jobs:
 - `actions/archive` for archive/export
 - `actions/upload` for App Store Connect upload

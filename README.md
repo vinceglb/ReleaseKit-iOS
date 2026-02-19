@@ -41,7 +41,7 @@ releasekit-ios-setup wizard
 ```yaml
 - name: Archive and export IPA
   id: ios_archive
-  uses: vinceglb/releasekit-ios/actions/archive@v1
+  uses: vinceglb/releasekit-ios/actions/archive@v0
   with:
     workspace: ios/App.xcworkspace
     scheme: App
@@ -82,7 +82,7 @@ Optional:
 ```yaml
 - name: Upload IPA from path
   id: ios_upload
-  uses: vinceglb/releasekit-ios/actions/upload@v1
+  uses: vinceglb/releasekit-ios/actions/upload@v0
   with:
     app_id: ${{ vars.ASC_APP_ID }}
     asc_key_id: ${{ secrets.ASC_KEY_ID }}
@@ -97,7 +97,7 @@ Optional:
 ```yaml
 - name: Upload IPA from artifact
   id: ios_upload
-  uses: vinceglb/releasekit-ios/actions/upload@v1
+  uses: vinceglb/releasekit-ios/actions/upload@v0
   with:
     app_id: ${{ vars.ASC_APP_ID }}
     asc_key_id: ${{ secrets.ASC_KEY_ID }}
@@ -147,7 +147,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - id: ios_archive
-        uses: vinceglb/releasekit-ios/actions/archive@v1
+        uses: vinceglb/releasekit-ios/actions/archive@v0
         with:
           workspace: ios/App.xcworkspace
           scheme: App
@@ -166,7 +166,7 @@ jobs:
     runs-on: macos-latest
     steps:
       - id: ios_upload
-        uses: vinceglb/releasekit-ios/actions/upload@v1
+        uses: vinceglb/releasekit-ios/actions/upload@v0
         with:
           app_id: ${{ vars.ASC_APP_ID }}
           asc_key_id: ${{ secrets.ASC_KEY_ID }}

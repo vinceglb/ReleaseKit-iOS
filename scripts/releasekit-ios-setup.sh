@@ -79,7 +79,7 @@ ASC auth options:
   --p8-b64 <value>               Base64-encoded .p8 content
 
 Workflow generation:
-  --write-workflows              Generate ios-build.yml workflow file
+  --write-workflows              Generate ios-release.yml workflow file
   --runner-label <label>         Runner label in generated workflows (default: macos-latest)
   --force                        Overwrite existing generated workflow files
 
@@ -916,7 +916,7 @@ write_embedded_workflow() {
 write_workflow_files() {
   local target_dir="$1"
   local workflow_dir="${target_dir}/.github/workflows"
-  local build_out="${workflow_dir}/ios-build.yml"
+  local build_out="${workflow_dir}/ios-release.yml"
 
   mkdir -p "${workflow_dir}"
 
@@ -1083,7 +1083,7 @@ run_check_mode() {
       target_dir="$(detect_git_root || pwd)"
     fi
 
-    local build_file="${target_dir}/.github/workflows/ios-build.yml"
+    local build_file="${target_dir}/.github/workflows/ios-release.yml"
 
     if [[ -f "${build_file}" ]]; then
       log done "Workflow present: ${build_file}"
@@ -1302,7 +1302,7 @@ collect_and_validate_setup_inputs() {
     if [[ "${INTERACTIVE}" -eq 1 ]]; then
       prompt_value REPO_DIR "Workflow target directory" "${REPO_DIR}"
 
-      local build_file="${REPO_DIR}/.github/workflows/ios-build.yml"
+      local build_file="${REPO_DIR}/.github/workflows/ios-release.yml"
       if [[ -f "${build_file}" && "${FORCE}" -ne 1 ]]; then
         if prompt_yes_no "Workflow file already exists at ${build_file}. Override it?" "n"; then
           FORCE=1
@@ -1403,7 +1403,7 @@ Summary:
   Workflows:       ${WORKFLOWS_STATUS}
 
 Next:
-  1) Trigger .github/workflows/ios-build.yml
+  1) Trigger .github/workflows/ios-release.yml
   2) Validate archive/export/upload outputs in GitHub Actions
 SUMMARY
 }
