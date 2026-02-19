@@ -1313,15 +1313,33 @@ collect_and_validate_setup_inputs() {
   fi
 
   if [[ "${WRITE_WORKFLOWS}" -eq 1 ]]; then
+    local should_write_workflow=1
+    local original_force="${FORCE}"
+
     if [[ -z "${REPO_DIR}" ]]; then
       REPO_DIR="$(detect_git_root || pwd)"
     fi
 
     if [[ "${INTERACTIVE}" -eq 1 ]]; then
       prompt_value REPO_DIR "Workflow target directory" "${REPO_DIR}"
+
+      local build_file="${REPO_DIR}/.github/workflows/ios-build.yml"
+      if [[ -f "${build_file}" && "${FORCE}" -ne 1 ]]; then
+        if prompt_yes_no "Workflow file already exists at ${build_file}. Override it?" "n"; then
+          FORCE=1
+        else
+          should_write_workflow=0
+          WORKFLOWS_STATUS="kept existing"
+          log check "Keeping existing workflow file and continuing setup."
+        fi
+      fi
     fi
 
-    write_workflow_files "${REPO_DIR}"
+    if [[ "${should_write_workflow}" -eq 1 ]]; then
+      write_workflow_files "${REPO_DIR}"
+    fi
+
+    FORCE="${original_force}"
   fi
 
   log check "Step 8/9: GitHub sync choice"
