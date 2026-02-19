@@ -7,9 +7,8 @@ on:
         description: Version component to bump (relative to the latest tag).
         type: choice
         required: true
-        default: patch
+        default: minor
         options:
-          - patch
           - minor
           - major
       prerelease_suffix:
@@ -40,30 +39,34 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Compute custom tag for pre-release
-        id: prerelease
-        if: inputs.prerelease_suffix != ''
+      - name: Compute tag
+        id: version
         shell: bash
         run: |
           set -euo pipefail
-          LATEST=$(git describe --tags --match "v[0-9]*" --abbrev=0 2>/dev/null || echo "v0.0.0")
+          LATEST=$(git describe --tags --match "v[0-9]*.[0-9]*" --abbrev=0 2>/dev/null || echo "v0.0")
+          echo "Latest tag: ${LATEST}"
+
           VERSION="${LATEST#v}"
-          IFS='.' read -r MAJOR MINOR PATCH <<< "${VERSION}"
-          PATCH="${PATCH%%-*}"
+          IFS='.' read -r MAJOR MINOR <<< "${VERSION%%[-+]*}"
+
           case "${{ inputs.bump_type }}" in
-            major) MAJOR=$((MAJOR + 1)); MINOR=0; PATCH=0 ;;
-            minor) MINOR=$((MINOR + 1)); PATCH=0 ;;
-            patch) PATCH=$((PATCH + 1)) ;;
+            major) MAJOR=$((MAJOR + 1)); MINOR=0 ;;
+            minor) MINOR=$((MINOR + 1)) ;;
           esac
-          echo "tag=${MAJOR}.${MINOR}.${PATCH}-${{ inputs.prerelease_suffix }}" >> "$GITHUB_OUTPUT"
+
+          TAG="${MAJOR}.${MINOR}"
+          SUFFIX="${{ inputs.prerelease_suffix }}"
+          [[ -n "${SUFFIX}" ]] && TAG="${TAG}-${SUFFIX}"
+
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
 
       - name: Bump and push tag
         id: tag
         uses: mathieudutour/github-tag-action@v6.2
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          default_bump: ${{ inputs.bump_type }}
-          custom_tag: ${{ steps.prerelease.outputs.tag }}
+          custom_tag: ${{ steps.version.outputs.tag }}
           create_annotated_tag: true
           tag_prefix: v
 
