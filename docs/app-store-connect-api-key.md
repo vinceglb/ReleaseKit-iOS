@@ -112,7 +112,7 @@ If validation fails due to permissions, recreate the key with **Admin** role.
 - `ASC_KEY_ID`
 - `ASC_ISSUER_ID`
 - `ASC_PRIVATE_KEY_B64`
-- `ASC_TEAM_ID` (from Apple Developer account)
+- `ASC_TEAM_ID` (from Apple Developer account; store as GitHub variable)
 - `ASC_APP_ID` (App Store Connect app ID)
 
 ## Verification checklist

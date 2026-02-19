@@ -45,11 +45,11 @@ releasekit-ios-setup wizard
   with:
     workspace: ios/App.xcworkspace
     scheme: App
-    bundle_id: com.example.app
+    bundle_id: ${{ vars.BUNDLE_ID }}
     asc_key_id: ${{ secrets.ASC_KEY_ID }}
     asc_issuer_id: ${{ secrets.ASC_ISSUER_ID }}
     asc_private_key_b64: ${{ secrets.ASC_PRIVATE_KEY_B64 }}
-    asc_team_id: ${{ secrets.ASC_TEAM_ID }}
+    asc_team_id: ${{ vars.ASC_TEAM_ID }}
 ```
 
 ### Inputs
@@ -145,18 +145,18 @@ jobs:
   archive:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - id: ios_archive
         uses: vinceglb/releasekit-ios/actions/archive@v1
         with:
           workspace: ios/App.xcworkspace
           scheme: App
-          bundle_id: com.example.app
+          bundle_id: ${{ vars.BUNDLE_ID }}
           asc_key_id: ${{ secrets.ASC_KEY_ID }}
           asc_issuer_id: ${{ secrets.ASC_ISSUER_ID }}
           asc_private_key_b64: ${{ secrets.ASC_PRIVATE_KEY_B64 }}
-          asc_team_id: ${{ secrets.ASC_TEAM_ID }}
-      - uses: actions/upload-artifact@v4
+          asc_team_id: ${{ vars.ASC_TEAM_ID }}
+      - uses: actions/upload-artifact@v6
         with:
           name: Marmalade.ipa
           path: ${{ steps.ios_archive.outputs.ipa_path }}
@@ -179,7 +179,8 @@ jobs:
 ## Security Notes
 
 - Cloud signing requires an API key with **Admin** role.
-- Generated templates use `@v0`; pin a full tag/SHA for stricter reproducibility.
+- `ASC_TEAM_ID` and `BUNDLE_ID` are identifiers (not secrets); store them as repository variables.
+- Generated workflow files use `@v0`; pin a full tag/SHA for stricter reproducibility.
 
 ## Publishing a Release
 

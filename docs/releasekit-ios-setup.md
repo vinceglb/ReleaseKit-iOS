@@ -37,10 +37,11 @@ GitHub repository secrets:
 - `ASC_KEY_ID`
 - `ASC_ISSUER_ID`
 - `ASC_PRIVATE_KEY_B64`
-- `ASC_TEAM_ID`
 
-GitHub repository variable:
+GitHub repository variables:
 - `ASC_APP_ID`
+- `ASC_TEAM_ID`
+- `BUNDLE_ID`
 
 Optional generated workflows:
 - `.github/workflows/ios-build.yml`
@@ -73,11 +74,11 @@ Optional generated workflows:
 - Resolve `ASC_APP_ID` from bundle ID with `asc`, with fallback prompt.
 
 7. Workflow generation
-- Optional template generation with overwrite protection (`--force`).
-- Uses local repo templates when available, otherwise built-in templates (global install friendly).
+- Optional workflow generation with overwrite protection (`--force`).
+- Uses embedded workflow templates (global install friendly).
 
 8. GitHub sync
-- If `gh` is available and authenticated, optionally write secrets/variable directly.
+- If `gh` is available and authenticated, optionally write secrets/variables directly.
 - Otherwise prints manual values to copy.
 
 9. Final summary
@@ -149,8 +150,8 @@ RELEASEKIT_IOS_SETUP_DEBUG=1 releasekit-ios-setup wizard
 
 If `gh` is missing or unauthenticated, the wizard still completes setup and prints exact values to configure manually in GitHub:
 
-- Secrets: `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_PRIVATE_KEY_B64`, `ASC_TEAM_ID`
-- Variable: `ASC_APP_ID`
+- Secrets: `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_PRIVATE_KEY_B64`
+- Variables: `ASC_APP_ID`, `ASC_TEAM_ID`, `BUNDLE_ID`
 
 ## Troubleshooting
 

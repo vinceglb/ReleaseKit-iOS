@@ -79,7 +79,7 @@ ASC auth options:
   --p8-b64 <value>               Base64-encoded .p8 content
 
 Workflow generation:
-  --write-workflows              Generate ios-build.yml from template
+  --write-workflows              Generate ios-build.yml workflow file
   --runner-label <label>         Runner label in generated workflows (default: macos-latest)
   --force                        Overwrite existing generated workflow files
 
@@ -534,6 +534,7 @@ ensure_bundle_and_team() {
 
   if [[ -z "${TEAM_ID}" ]]; then
     if [[ "${INTERACTIVE}" -eq 1 ]]; then
+      log check "Find Team ID at https://developer.apple.com/account in the \"Membership details\" section."
       prompt_value TEAM_ID "Apple Team ID" "${detected_team}" "0"
     else
       TEAM_ID="${detected_team}"
@@ -752,6 +753,7 @@ EOF_APPS
   fi
 
   if [[ "${INTERACTIVE}" -eq 1 ]]; then
+    log check "Find App ID in App Store Connect (https://appstoreconnect.apple.com/apps) > Your App > App Information > Apple ID."
     prompt_value APP_ID "App Store Connect app ID"
   fi
 
@@ -776,25 +778,18 @@ validate_input_combinations() {
   fi
 }
 
-render_template() {
-  local template_path="$1"
-  local output_path="$2"
+render_workflow_placeholders() {
+  local output_path="$1"
 
-  cp "${template_path}" "${output_path}"
-
-  local escaped_workspace escaped_scheme escaped_bundle_id escaped_team_id escaped_runner escaped_action_ref
+  local escaped_workspace escaped_scheme escaped_runner escaped_action_ref
   escaped_workspace="$(printf '%s' "${WORKSPACE}" | sed 's/[\/&]/\\&/g')"
   escaped_scheme="$(printf '%s' "${SCHEME}" | sed 's/[\/&]/\\&/g')"
-  escaped_bundle_id="$(printf '%s' "${BUNDLE_ID}" | sed 's/[\/&]/\\&/g')"
-  escaped_team_id="$(printf '%s' "${TEAM_ID}" | sed 's/[\/&]/\\&/g')"
   escaped_runner="$(printf '%s' "${RUNNER_LABEL}" | sed 's/[\/&]/\\&/g')"
   escaped_action_ref="$(printf '%s' "${ACTION_REF}" | sed 's/[\/&]/\\&/g')"
 
   sed -i.bak \
     -e "s/__WORKSPACE__/${escaped_workspace}/g" \
     -e "s/__SCHEME__/${escaped_scheme}/g" \
-    -e "s/__BUNDLE_ID__/${escaped_bundle_id}/g" \
-    -e "s/__TEAM_ID__/${escaped_team_id}/g" \
     -e "s/__RUNNER_LABEL__/${escaped_runner}/g" \
     -e "s/__ACTION_REF__/${escaped_action_ref}/g" \
     "${output_path}"
@@ -824,8 +819,8 @@ on:
 env:
   WORKSPACE: __WORKSPACE__
   SCHEME: __SCHEME__
-  BUNDLE_ID: __BUNDLE_ID__
-  TEAM_ID: __TEAM_ID__
+  BUNDLE_ID: ${{ vars.BUNDLE_ID }}
+  TEAM_ID: ${{ vars.ASC_TEAM_ID }}
 
 jobs:
   archive:
@@ -836,7 +831,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Select Xcode
         uses: maxim-lobanov/setup-xcode@v1
@@ -853,7 +848,7 @@ jobs:
           asc_key_id: ${{ secrets.ASC_KEY_ID }}
           asc_issuer_id: ${{ secrets.ASC_ISSUER_ID }}
           asc_private_key_b64: ${{ secrets.ASC_PRIVATE_KEY_B64 }}
-          asc_team_id: ${{ secrets.ASC_TEAM_ID }}
+          asc_team_id: ${{ env.TEAM_ID }}
           configuration: Release
 
       - name: Set artifact metadata
@@ -861,7 +856,7 @@ jobs:
         run: echo "name=Marmalade.ipa" >> "$GITHUB_OUTPUT"
 
       - name: Upload IPA artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ${{ steps.artifact_meta.outputs.name }}
           path: ${{ steps.ios_archive.outputs.ipa_path }}
@@ -910,42 +905,17 @@ EOF
   esac
 }
 
-write_template_with_fallback() {
+write_embedded_workflow() {
   local template_key="$1"
-  local template_path="$2"
-  local output_path="$3"
+  local output_path="$2"
 
-  if [[ -f "${template_path}" ]]; then
-    render_template "${template_path}" "${output_path}"
-    return 0
-  fi
-
-  log check "Template file not found at ${template_path}. Using embedded '${template_key}' template."
   write_embedded_template "${template_key}" "${output_path}"
-
-  local escaped_workspace escaped_scheme escaped_bundle_id escaped_team_id escaped_runner escaped_action_ref
-  escaped_workspace="$(printf '%s' "${WORKSPACE}" | sed 's/[\/&]/\\&/g')"
-  escaped_scheme="$(printf '%s' "${SCHEME}" | sed 's/[\/&]/\\&/g')"
-  escaped_bundle_id="$(printf '%s' "${BUNDLE_ID}" | sed 's/[\/&]/\\&/g')"
-  escaped_team_id="$(printf '%s' "${TEAM_ID}" | sed 's/[\/&]/\\&/g')"
-  escaped_runner="$(printf '%s' "${RUNNER_LABEL}" | sed 's/[\/&]/\\&/g')"
-  escaped_action_ref="$(printf '%s' "${ACTION_REF}" | sed 's/[\/&]/\\&/g')"
-
-  sed -i.bak \
-    -e "s/__WORKSPACE__/${escaped_workspace}/g" \
-    -e "s/__SCHEME__/${escaped_scheme}/g" \
-    -e "s/__BUNDLE_ID__/${escaped_bundle_id}/g" \
-    -e "s/__TEAM_ID__/${escaped_team_id}/g" \
-    -e "s/__RUNNER_LABEL__/${escaped_runner}/g" \
-    -e "s/__ACTION_REF__/${escaped_action_ref}/g" \
-    "${output_path}"
-  rm -f "${output_path}.bak"
+  render_workflow_placeholders "${output_path}"
 }
 
 write_workflow_files() {
   local target_dir="$1"
   local workflow_dir="${target_dir}/.github/workflows"
-  local build_tpl="${ROOT_DIR}/templates/workflows/ios-build.yml.tpl"
   local build_out="${workflow_dir}/ios-build.yml"
 
   mkdir -p "${workflow_dir}"
@@ -954,7 +924,7 @@ write_workflow_files() {
     die "${build_out} already exists (use --force to overwrite)"
   fi
 
-  write_template_with_fallback "build" "${build_tpl}" "${build_out}"
+  write_embedded_workflow "build" "${build_out}"
 
   log write "Wrote ${build_out}"
   WORKFLOWS_STATUS="written"
@@ -997,10 +967,11 @@ Secrets:
   ASC_KEY_ID=${ASC_KEY_ID}
   ASC_ISSUER_ID=${ASC_ISSUER_ID}
   ASC_PRIVATE_KEY_B64=${ASC_PRIVATE_KEY_B64}
-  ASC_TEAM_ID=${TEAM_ID}
 
-Variable:
+Variables:
   ASC_APP_ID=${APP_ID}
+  ASC_TEAM_ID=${TEAM_ID}
+  BUNDLE_ID=${BUNDLE_ID}
 
 VALUES
 }
@@ -1029,12 +1000,13 @@ ensure_repo_for_sync() {
 sync_to_github() {
   ensure_repo_for_sync
 
-  log set "Configuring GitHub secrets and variable in ${REPO}"
+  log set "Configuring GitHub secrets and variables in ${REPO}"
   set_repo_secret "ASC_KEY_ID" "${ASC_KEY_ID}"
   set_repo_secret "ASC_ISSUER_ID" "${ASC_ISSUER_ID}"
   set_repo_secret "ASC_PRIVATE_KEY_B64" "${ASC_PRIVATE_KEY_B64}"
-  set_repo_secret "ASC_TEAM_ID" "${TEAM_ID}"
   set_repo_variable "ASC_APP_ID" "${APP_ID}"
+  set_repo_variable "ASC_TEAM_ID" "${TEAM_ID}"
+  set_repo_variable "BUNDLE_ID" "${BUNDLE_ID}"
 
   GITHUB_SYNC_STATUS="written"
 }
@@ -1084,11 +1056,18 @@ run_check_mode() {
     log done "Secret present: ASC_PRIVATE_KEY_B64"
   fi
 
-  if ! check_secret_exists "${REPO}" "ASC_TEAM_ID"; then
-    log check "Missing secret: ASC_TEAM_ID"
+  if ! check_variable_exists "${REPO}" "ASC_TEAM_ID"; then
+    log check "Missing variable: ASC_TEAM_ID"
     missing=1
   else
-    log done "Secret present: ASC_TEAM_ID"
+    log done "Variable present: ASC_TEAM_ID"
+  fi
+
+  if ! check_variable_exists "${REPO}" "BUNDLE_ID"; then
+    log check "Missing variable: BUNDLE_ID"
+    missing=1
+  else
+    log done "Variable present: BUNDLE_ID"
   fi
 
   if ! check_variable_exists "${REPO}" "ASC_APP_ID"; then
@@ -1307,7 +1286,7 @@ collect_and_validate_setup_inputs() {
 
   log check "Step 7/9: Workflow generation choice"
   if [[ "${INTERACTIVE}" -eq 1 && "${WRITE_WORKFLOWS}" -eq 0 ]]; then
-    if prompt_yes_no "Generate iOS build workflow from template now?" "n"; then
+    if prompt_yes_no "Generate iOS build workflow now?" "n"; then
       WRITE_WORKFLOWS=1
     fi
   fi
@@ -1347,7 +1326,7 @@ collect_and_validate_setup_inputs() {
   if [[ "${GH_AVAILABLE}" -eq 1 && "${GH_AUTHENTICATED}" -eq 1 ]]; then
     local should_sync=1
     if [[ "${INTERACTIVE}" -eq 1 ]]; then
-      if ! prompt_yes_no "Create/update GitHub secrets and ASC_APP_ID in the target repo now?" "y"; then
+      if ! prompt_yes_no "Create/update GitHub secrets and variables (ASC_APP_ID/ASC_TEAM_ID/BUNDLE_ID) in the target repo now?" "y"; then
         should_sync=0
       fi
     fi
