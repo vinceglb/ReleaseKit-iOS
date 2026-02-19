@@ -43,6 +43,7 @@ jobs:
           ruby -e "require 'yaml'; YAML.load_file('.github/workflows/ci.yml')"
           ruby -e "require 'yaml'; YAML.load_file('.github/workflows/release-cli-beta.yml')"
           ruby -e "require 'yaml'; YAML.load_file('.github/workflows/smoke.yml')"
+          ruby -e "require 'yaml'; YAML.load_file('.github/workflows/tag.yml')"
 
       - name: Check required action metadata
         run: |
