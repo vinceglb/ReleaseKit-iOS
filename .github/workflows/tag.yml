@@ -28,6 +28,8 @@ jobs:
   create-tag:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    outputs:
+      new_tag: ${{ steps.tag.outputs.new_tag }}
     steps:
       - name: Require main branch
         if: github.ref_name != 'main'
@@ -96,3 +98,11 @@ jobs:
           | **Floating tag** | \`${MAJOR_TAG}\` → \`${NEW_TAG}\` |
           | **Commit** | \`${GITHUB_SHA}\` |
           EOF
+
+  trigger-release:
+    needs: create-tag
+    uses: ./.github/workflows/release-cli-beta.yml
+    with:
+      tag_name: ${{ needs.create-tag.outputs.new_tag }}
+    permissions:
+      contents: write
