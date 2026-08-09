@@ -1,0 +1,106 @@
+name: ReleaseKit-iOS App Store Release
+description: Prepare an uploaded iOS app update and optionally submit it for App Review.
+author: vinceglb
+
+inputs:
+  app_id:
+    description: App Store Connect app ID for the existing app.
+    required: true
+  ipa_path:
+    description: Local path to the IPA that has already been uploaded to App Store Connect.
+    required: true
+  release_notes_dir:
+    description: Directory containing one UTF-8 <locale>.txt Store Release Note per enabled locale.
+    required: true
+  asc_key_id:
+    description: App Store Connect API key ID.
+    required: true
+  asc_issuer_id:
+    description: App Store Connect API issuer ID.
+    required: true
+  asc_private_key_b64:
+    description: Base64-encoded contents of the App Store Connect private key (.p8).
+    required: true
+  submit_for_review:
+    description: Submit the prepared update for App Review.
+    required: false
+    default: "false"
+  release_type:
+    description: App Store release policy (MANUAL or AFTER_APPROVAL).
+    required: false
+    default: MANUAL
+  processing_timeout:
+    description: Maximum time to wait for the exact uploaded build to finish processing.
+    required: false
+    default: 30m
+  poll_interval:
+    description: Interval between exact-build processing polls.
+    required: false
+    default: 30s
+  asc_version:
+    description: "asc CLI version to install (default: latest)."
+    required: false
+    default: latest
+
+outputs:
+  bundle_id:
+    description: Bundle identifier extracted from the IPA.
+    value: ${{ steps.release.outputs.bundle_id }}
+  marketing_version:
+    description: Store Release Version extracted from the IPA.
+    value: ${{ steps.release.outputs.marketing_version }}
+  build_number:
+    description: Build number extracted from the IPA.
+    value: ${{ steps.release.outputs.build_number }}
+  app_store_version_id:
+    description: Matching App Store version resource ID.
+    value: ${{ steps.release.outputs.app_store_version_id }}
+  build_id:
+    description: Exact processed App Store build resource ID.
+    value: ${{ steps.release.outputs.build_id }}
+  submission_id:
+    description: Review submission resource ID when submission was requested or already exists.
+    value: ${{ steps.release.outputs.submission_id }}
+  submission_state:
+    description: Review submission state when applicable.
+    value: ${{ steps.release.outputs.submission_state }}
+  app_store_connect_url:
+    description: Direct App Store Connect navigation URL for the update.
+    value: ${{ steps.release.outputs.app_store_connect_url }}
+  result_json:
+    description: Compact structured result for downstream automation.
+    value: ${{ steps.release.outputs.result_json }}
+
+runs:
+  using: composite
+  steps:
+    - name: Install asc CLI
+      uses: rudrankriyam/setup-asc@v1
+      with:
+        version: ${{ inputs.asc_version }}
+
+    - name: Summarize asc version
+      shell: bash
+      run: |
+        selected_version="$(asc version)"
+        echo "Using asc ${selected_version}"
+        if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
+          echo "- asc CLI: \`${selected_version}\`" >> "${GITHUB_STEP_SUMMARY}"
+        fi
+
+    - name: Prepare App Store release
+      id: release
+      shell: bash
+      run: ${{ github.action_path }}/../../scripts/release.sh
+      env:
+        INPUT_APP_ID: ${{ inputs.app_id }}
+        INPUT_IPA_PATH: ${{ inputs.ipa_path }}
+        INPUT_RELEASE_NOTES_DIR: ${{ inputs.release_notes_dir }}
+        INPUT_ASC_KEY_ID: ${{ inputs.asc_key_id }}
+        INPUT_ASC_ISSUER_ID: ${{ inputs.asc_issuer_id }}
+        INPUT_ASC_PRIVATE_KEY_B64: ${{ inputs.asc_private_key_b64 }}
+        INPUT_SUBMIT_FOR_REVIEW: ${{ inputs.submit_for_review }}
+        INPUT_RELEASE_TYPE: ${{ inputs.release_type }}
+        INPUT_PROCESSING_TIMEOUT: ${{ inputs.processing_timeout }}
+        INPUT_POLL_INTERVAL: ${{ inputs.poll_interval }}
+        INPUT_ASC_VERSION: ${{ inputs.asc_version }}
