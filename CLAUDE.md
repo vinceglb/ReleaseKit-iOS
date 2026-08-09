@@ -5,9 +5,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Project Overview
 
 ReleaseKit-iOS is a GitHub Actions-based CI/CD toolkit for distributing iOS apps to the App Store. It provides:
-- **Two composite GitHub Actions** (`actions/archive/`, `actions/upload/`) that wrap Xcode and the `asc` CLI
+- **Three composite GitHub Actions** (`actions/archive/`, `actions/upload/`, `actions/release/`) that wrap Xcode and the `asc` CLI
 - **A Go CLI wizard** (`cli/`) that guides developers through initial setup
-- **Bash scripts** (`scripts/`) that implement the archive/upload logic
+- **Bash scripts** (`scripts/`) that implement the archive, upload, and App Store update-release logic
 - **An installer script** (`install-cli.sh`) for end-user CLI installation
 
 The key design: App Store Connect API handles cloud signing, so no local certificates are needed.
@@ -25,7 +25,9 @@ go run . wizard           # Run wizard locally
 ### Bash validation (from repo root)
 
 ```bash
-bash -n scripts/archive.sh scripts/upload.sh scripts/lib/common.sh  # Check syntax
+bash -n scripts/archive.sh scripts/upload.sh scripts/release.sh scripts/lib/common.sh  # Check syntax
+ruby tests/release_action_contract_test.rb  # Release action metadata contract
+ruby tests/release_script_test.rb           # Release behavior and cleanup contracts
 ```
 
 ### CI runs (via GitHub Actions)
@@ -39,11 +41,11 @@ bash -n scripts/archive.sh scripts/upload.sh scripts/lib/common.sh  # Check synt
 
 ### Actions → Scripts → Tools
 
-The composite actions (`actions/archive/action.yml`, `actions/upload/action.yml`) pass inputs as environment variables to shell scripts, which then call `xcodebuild` and `asc`. Results flow back via `GITHUB_OUTPUT`.
+The composite actions under `actions/` pass inputs as environment variables to shell scripts, which then call `xcodebuild` and `asc`. Results flow back via `GITHUB_OUTPUT`. The release action starts from an already-uploaded IPA and keeps preparation/submission separate from upload.
 
 ### Shared Bash Library
 
-`scripts/lib/common.sh` provides utilities used by both `archive.sh` and `upload.sh`:
+`scripts/lib/common.sh` provides utilities used by `archive.sh`, `upload.sh`, and `release.sh`:
 - `fail()` / `require_non_empty()` — error handling with GitHub Actions annotations
 - `prepare_private_key_file()` — decodes base64 (including double-encoded) ASC `.p8` keys
 - `decode_base64()` — handles macOS vs Linux `base64` flag differences
@@ -63,7 +65,7 @@ The CLI's module path is `github.com/vinceglb/releasekit-ios/cli`.
 
 ### Release Process
 
-Pushing a `v*` tag triggers `.github/workflows/release-cli-beta.yml`, which:
+Pushing a dotted release tag (`vX.Y[.Z][-suffix]`) triggers `.github/workflows/release-cli-beta.yml`; floating action tags such as `v0` do not. The workflow:
 1. Runs `go test ./...`
 2. Validates the tag format (`vX.Y[.Z][-suffix]`)
 3. Builds `darwin/arm64` and `darwin/amd64` binaries with `-trimpath -ldflags='-s -w'`
@@ -84,7 +86,7 @@ The `old/` directory contains **frozen** archived files — the shell-based setu
 ## Key Dependencies
 
 - **Go**: Cobra (CLI), charmbracelet/huh (interactive forms), charmbracelet/lipgloss (styling)
-- **External tools**: `xcodebuild` (macOS only), `asc` (App-Store-Connect-CLI), `jq` (optional)
+- **External tools**: `xcodebuild` (macOS only), `asc` (App-Store-Connect-CLI), plus `jq` and `python3` for the release action (`jq` remains optional for upload-only use)
 - **Actions**: `rudrankriyam/setup-asc@v1` installs `asc` in workflows
 
 ## Conventions
