@@ -13,6 +13,10 @@ class ReleaseActionContractTest < Minitest::Test
     asc_key_id
     asc_issuer_id
     asc_private_key_b64
+    review_contact_first_name
+    review_contact_last_name
+    review_contact_email
+    review_contact_phone
     submit_for_review
     release_type
     processing_timeout

@@ -21,6 +21,22 @@ inputs:
   asc_private_key_b64:
     description: Base64-encoded contents of the App Store Connect private key (.p8).
     required: true
+  review_contact_first_name:
+    description: App Review contact first name. Must be supplied with all other review contact inputs.
+    required: false
+    default: ""
+  review_contact_last_name:
+    description: App Review contact last name. Must be supplied with all other review contact inputs.
+    required: false
+    default: ""
+  review_contact_email:
+    description: App Review contact email. Must be supplied with all other review contact inputs.
+    required: false
+    default: ""
+  review_contact_phone:
+    description: App Review contact phone. Must be supplied with all other review contact inputs.
+    required: false
+    default: ""
   submit_for_review:
     description: Submit the prepared update for App Review.
     required: false
@@ -99,6 +115,10 @@ runs:
         INPUT_ASC_KEY_ID: ${{ inputs.asc_key_id }}
         INPUT_ASC_ISSUER_ID: ${{ inputs.asc_issuer_id }}
         INPUT_ASC_PRIVATE_KEY_B64: ${{ inputs.asc_private_key_b64 }}
+        INPUT_REVIEW_CONTACT_FIRST_NAME: ${{ inputs.review_contact_first_name }}
+        INPUT_REVIEW_CONTACT_LAST_NAME: ${{ inputs.review_contact_last_name }}
+        INPUT_REVIEW_CONTACT_EMAIL: ${{ inputs.review_contact_email }}
+        INPUT_REVIEW_CONTACT_PHONE: ${{ inputs.review_contact_phone }}
         INPUT_SUBMIT_FOR_REVIEW: ${{ inputs.submit_for_review }}
         INPUT_RELEASE_TYPE: ${{ inputs.release_type }}
         INPUT_PROCESSING_TIMEOUT: ${{ inputs.processing_timeout }}

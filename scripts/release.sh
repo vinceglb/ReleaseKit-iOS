@@ -5,6 +5,24 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=scripts/lib/common.sh
 source "${SCRIPT_DIR}/lib/common.sh"
 
+review_contact_count=0
+for review_contact_value in \
+  "${INPUT_REVIEW_CONTACT_FIRST_NAME:-}" \
+  "${INPUT_REVIEW_CONTACT_LAST_NAME:-}" \
+  "${INPUT_REVIEW_CONTACT_EMAIL:-}" \
+  "${INPUT_REVIEW_CONTACT_PHONE:-}"; do
+  if [[ -n "${review_contact_value}" ]]; then
+    echo "::add-mask::${review_contact_value}"
+    review_contact_count=$((review_contact_count + 1))
+  fi
+done
+
+case "${review_contact_count}" in
+  0) review_contact_supplied=false ;;
+  4) review_contact_supplied=true ;;
+  *) fail "App Review contact inputs must be supplied all together or all omitted." ;;
+esac
+
 require_non_empty "INPUT_APP_ID" "${INPUT_APP_ID:-}"
 require_non_empty "INPUT_IPA_PATH" "${INPUT_IPA_PATH:-}"
 require_non_empty "INPUT_RELEASE_NOTES_DIR" "${INPUT_RELEASE_NOTES_DIR:-}"
@@ -208,6 +226,39 @@ notes_json="$(python3 "${contract_helper}" validate-notes "${release_notes_dir}"
 state_is_editable=false
 if [[ "${version_state}" == "PREPARE_FOR_SUBMISSION" ]]; then
   state_is_editable=true
+fi
+
+if [[ "${state_is_editable}" == true && "${review_contact_supplied}" == true ]]; then
+  if ! review_detail_json="$(asc_ci review details-for-version \
+      --version-id "${app_store_version_id}" \
+      --output json 2> "${tmp_dir}/review-detail.stderr")"; then
+    fail "Unable to inspect the App Review contact details. No contact information was changed."
+  fi
+
+  review_detail_configured="$(jq -r 'if has("configured") then .configured else true end' <<< "${review_detail_json}")"
+  review_detail_id="$(jq -r '.data.id // .id // empty' <<< "${review_detail_json}")"
+  if [[ "${review_detail_configured}" == false ]]; then
+    if ! asc_ci review details-create \
+        --version-id "${app_store_version_id}" \
+        --contact-first-name "${INPUT_REVIEW_CONTACT_FIRST_NAME}" \
+        --contact-last-name "${INPUT_REVIEW_CONTACT_LAST_NAME}" \
+        --contact-email "${INPUT_REVIEW_CONTACT_EMAIL}" \
+        --contact-phone "${INPUT_REVIEW_CONTACT_PHONE}" \
+        --output json > /dev/null 2>&1; then
+      fail "Unable to create the App Review contact details. Prepared state was preserved for retry."
+    fi
+  else
+    [[ -n "${review_detail_id}" ]] || fail "Unable to resolve the App Review detail resource ID. No contact information was changed."
+    if ! asc_ci review details-update \
+        --id "${review_detail_id}" \
+        --contact-first-name "${INPUT_REVIEW_CONTACT_FIRST_NAME}" \
+        --contact-last-name "${INPUT_REVIEW_CONTACT_LAST_NAME}" \
+        --contact-email "${INPUT_REVIEW_CONTACT_EMAIL}" \
+        --contact-phone "${INPUT_REVIEW_CONTACT_PHONE}" \
+        --output json > /dev/null 2>&1; then
+      fail "Unable to update the App Review contact details. Prepared state was preserved for retry."
+    fi
+  fi
 fi
 
 localization_matches=true
