@@ -22,6 +22,10 @@ Credentials are decoded into an isolated temporary directory, registered with a 
 | `asc_key_id` | Yes | — | App Store Connect API key ID. |
 | `asc_issuer_id` | Yes | — | App Store Connect API issuer ID. |
 | `asc_private_key_b64` | Yes | — | Single-base64-encoded `.p8` private key. |
+| `review_contact_first_name` | No | — | App Review contact first name. |
+| `review_contact_last_name` | No | — | App Review contact last name. |
+| `review_contact_email` | No | — | App Review contact email. |
+| `review_contact_phone` | No | — | App Review contact phone. |
 | `submit_for_review` | No | `false` | Submit the prepared update through Apple's review-submission flow. |
 | `release_type` | No | `MANUAL` | `MANUAL` or `AFTER_APPROVAL`. The latter releases to everyone after approval; this action does not enable phased release. |
 | `processing_timeout` | No | `30m` | Maximum wait for the exact build to become `VALID`. |
@@ -29,6 +33,8 @@ Credentials are decoded into an isolated temporary directory, registered with a 
 | `asc_version` | No | `latest` | `asc` version installed by `setup-asc`; the selected version appears in the job summary. |
 
 Store Release Notes must be valid UTF-8, non-empty, no longer than 4,000 characters, and named with the exact App Store locale. Missing, extra, malformed, and non-text entries fail the run. Notes may deliberately be identical to notes from an earlier update.
+
+The four App Review contact inputs are optional as a group: provide all four or omit all four. When provided, ReleaseKit masks them and applies them to the editable App Store version before readiness validation. Store the values as GitHub Actions secrets; they are never exposed as action outputs or included in the job summary.
 
 ## Outputs
 
@@ -81,6 +87,10 @@ release_ios_to_app_store:
         asc_key_id: ${{ secrets.ASC_KEY_ID }}
         asc_issuer_id: ${{ secrets.ASC_ISSUER_ID }}
         asc_private_key_b64: ${{ secrets.ASC_PRIVATE_KEY_B64 }}
+        review_contact_first_name: ${{ secrets.IOS_REVIEW_CONTACT_FIRST_NAME }}
+        review_contact_last_name: ${{ secrets.IOS_REVIEW_CONTACT_LAST_NAME }}
+        review_contact_email: ${{ secrets.IOS_REVIEW_CONTACT_EMAIL }}
+        review_contact_phone: ${{ secrets.IOS_REVIEW_CONTACT_PHONE }}
         submit_for_review: true
         release_type: AFTER_APPROVAL
 ```
