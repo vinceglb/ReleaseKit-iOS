@@ -30,10 +30,8 @@ jobs:
           bash -n scripts/release.sh
           bash -n scripts/lib/common.sh
 
-      - name: Run action contract and script tests
+      - name: Run release action contract tests
         run: |
-          ruby tests/upload_action_contract_test.rb
-          ruby tests/upload_script_test.rb
           ruby tests/release_action_contract_test.rb
           ruby tests/release_script_test.rb
 

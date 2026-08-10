@@ -218,30 +218,13 @@ jobs:
           artifact_download_path: ${{ runner.temp }}/smoke-upload
           wait_for_processing: "false"
 
-      - name: Retry the same IPA through the upload action (path mode)
-        id: upload_retry_step
-        if: ${{ inputs.scenario == 'split-happy-path' && steps.upload_step.outcome == 'success' }}
-        continue-on-error: true
-        uses: ./actions/upload
-        with:
-          app_id: ${{ inputs.app_id }}
-          asc_key_id: ${{ secrets.ASC_KEY_ID }}
-          asc_issuer_id: ${{ secrets.ASC_ISSUER_ID }}
-          asc_private_key_b64: ${{ secrets.ASC_PRIVATE_KEY_B64 }}
-          ipa_path: ${{ steps.upload_step.outputs.ipa_path }}
-          wait_for_processing: "false"
-
       - name: Assert upload scenario result
         run: |
           outcome="${{ steps.upload_step.outcome }}"
-          retry_outcome="${{ steps.upload_retry_step.outcome }}"
-          retry_result="${{ steps.upload_retry_step.outputs.outcome }}"
           scenario="${{ inputs.scenario }}"
 
           if [[ "${scenario}" == "split-happy-path" ]]; then
             [[ "${outcome}" == "success" ]] || { echo "split-happy-path should succeed."; exit 1; }
-            [[ "${retry_outcome}" == "success" ]] || { echo "split-happy-path retry should succeed."; exit 1; }
-            [[ "${retry_result}" == "reused" ]] || { echo "split-happy-path retry should reuse the exact upload/build."; exit 1; }
           else
             [[ "${outcome}" == "failure" ]] || { echo "split-bad-app-id should fail in upload stage."; exit 1; }
           fi

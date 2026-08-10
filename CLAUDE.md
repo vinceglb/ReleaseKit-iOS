@@ -86,7 +86,7 @@ The `old/` directory contains **frozen** archived files — the shell-based setu
 ## Key Dependencies
 
 - **Go**: Cobra (CLI), charmbracelet/huh (interactive forms), charmbracelet/lipgloss (styling)
-- **External tools**: `xcodebuild` (macOS only), `asc` (App-Store-Connect-CLI), `python3` for upload/release IPA and JSON contracts, and `jq` for the release action (`jq` remains optional for upload-only use)
+- **External tools**: `xcodebuild` (macOS only), `asc` (App-Store-Connect-CLI), plus `jq` and `python3` for the release action (`jq` remains optional for upload-only use)
 - **Actions**: `rudrankriyam/setup-asc@v1` installs `asc` in workflows
 
 ## Conventions

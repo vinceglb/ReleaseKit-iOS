@@ -45,17 +45,14 @@ outputs:
     description: IPA path used for upload.
     value: ${{ steps.upload.outputs.ipa_path }}
   upload_id:
-    description: App Store Connect build upload ID returned by asc; empty when reused.
+    description: App Store Connect build upload ID returned by asc.
     value: ${{ steps.upload.outputs.upload_id }}
   file_id:
-    description: App Store Connect build upload file ID returned by asc; empty when reused.
+    description: App Store Connect build upload file ID returned by asc.
     value: ${{ steps.upload.outputs.file_id }}
   asc_result_json:
-    description: Compact JSON response from asc builds upload; empty when reused.
+    description: Compact JSON response from asc builds upload.
     value: ${{ steps.upload.outputs.asc_result_json }}
-  outcome:
-    description: Upload outcome, either uploaded for a new upload or reused for an exact existing build/upload.
-    value: ${{ steps.upload.outputs.outcome }}
 
 runs:
   using: composite
