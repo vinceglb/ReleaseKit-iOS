@@ -26,6 +26,7 @@ go run . wizard           # Run wizard locally
 
 ```bash
 bash -n scripts/archive.sh scripts/upload.sh scripts/release.sh scripts/lib/common.sh  # Check syntax
+ruby tests/archive_script_test.rb          # Archive export-options contract
 ruby tests/release_action_contract_test.rb  # Release action metadata contract
 ruby tests/release_script_test.rb           # Release behavior and cleanup contracts
 ```

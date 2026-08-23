@@ -60,6 +60,8 @@ cat > "${export_options_path}" <<PLIST
 <dict>
   <key>method</key>
   <string>app-store-connect</string>
+  <key>destination</key>
+  <string>export</string>
   <key>signingStyle</key>
   <string>automatic</string>
   <key>signingCertificate</key>
