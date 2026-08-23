@@ -32,6 +32,7 @@ jobs:
 
       - name: Run release action contract tests
         run: |
+          ruby tests/archive_script_test.rb
           ruby tests/release_action_contract_test.rb
           ruby tests/release_script_test.rb
 
