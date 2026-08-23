@@ -32,7 +32,6 @@ jobs:
 
       - name: Run release action contract tests
         run: |
-          ruby tests/archive_script_test.rb
           ruby tests/release_action_contract_test.rb
           ruby tests/release_script_test.rb
 
@@ -68,3 +67,12 @@ jobs:
           grep -q 'using: composite' actions/release/action.yml
           grep -q '^inputs:' actions/release/action.yml
           grep -q '^outputs:' actions/release/action.yml
+
+  archive-contract:
+    runs-on: macos-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Run archive action contract test
+        run: ruby tests/archive_script_test.rb
