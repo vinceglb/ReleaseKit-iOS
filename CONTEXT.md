@@ -8,6 +8,10 @@ ReleaseKit iOS packages and publishes iOS builds through App Store Connect.
 The bundle identifier, marketing version, and build number that together identify one iOS build.
 _Avoid_: Latest build, matching IPA
 
+**Local export**:
+An IPA export that preserves its exact IPA identity without creating or modifying an App Store Connect delivery attempt.
+_Avoid_: Pre-upload, reserved upload
+
 **Upload retry**:
 A later, non-overlapping upload request for the same exact IPA identity. Simultaneous upload requests are not upload retries.
 _Avoid_: Concurrent upload

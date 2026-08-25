@@ -28,12 +28,13 @@ class ArchiveScriptTest < Minitest::Test
     FileUtils.remove_entry(@tmp)
   end
 
-  def test_forces_xcode_to_export_locally_before_the_separate_upload_step
+  def test_exports_locally_without_xcode_managing_the_build_number
     result = run_archive
 
     assert result[:status].success?, result[:stderr]
     export_options = File.read(@captured_export_options)
     assert_match(%r{<key>destination</key>\s*<string>export</string>}, export_options)
+    assert_match(%r{<key>manageAppVersionAndBuildNumber</key>\s*<false\s*/>}, export_options)
   end
 
   private

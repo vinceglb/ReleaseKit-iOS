@@ -62,6 +62,8 @@ cat > "${export_options_path}" <<PLIST
   <string>app-store-connect</string>
   <key>destination</key>
   <string>export</string>
+  <key>manageAppVersionAndBuildNumber</key>
+  <false/>
   <key>signingStyle</key>
   <string>automatic</string>
   <key>signingCertificate</key>
