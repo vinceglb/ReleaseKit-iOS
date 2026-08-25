@@ -51,9 +51,10 @@ class ArchiveScriptTest < Minitest::Test
     archive_command = commands.find { |command| command.start_with?("archive ") }
     export_command = commands.find { |command| command.start_with?("-exportArchive ") }
 
-    assert_includes archive_command, "CODE_SIGN_STYLE=Manual"
-    assert_includes archive_command, "CODE_SIGN_IDENTITY=Apple Distribution"
-    assert_includes archive_command, "PROVISIONING_PROFILE_SPECIFIER=PROFILE-UUID"
+    refute_includes archive_command, "CODE_SIGN_STYLE="
+    refute_includes archive_command, "CODE_SIGN_IDENTITY="
+    refute_includes archive_command, "PROVISIONING_PROFILE_SPECIFIER="
+    refute_includes archive_command, "DEVELOPMENT_TEAM="
     refute_includes archive_command, "-allowProvisioningUpdates"
     refute_includes archive_command, "-authenticationKeyPath"
     refute_includes archive_command, "-authenticationKeyID"

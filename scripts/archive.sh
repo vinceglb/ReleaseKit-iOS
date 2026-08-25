@@ -222,15 +222,13 @@ cat > "${export_options_path}" <<PLIST
 PLIST
 
 echo "Archiving scheme '${INPUT_SCHEME}' from workspace '${INPUT_WORKSPACE}'"
+# Command-line signing overrides apply to every target, including unsigned Swift
+# package targets. Keep archive signing scoped by the project's own settings.
 xcodebuild archive \
   -workspace "${INPUT_WORKSPACE}" \
   -scheme "${INPUT_SCHEME}" \
   -configuration "${INPUT_CONFIGURATION}" \
-  -archivePath "${archive_path}" \
-  CODE_SIGN_STYLE=Manual \
-  CODE_SIGN_IDENTITY="Apple Distribution" \
-  PROVISIONING_PROFILE_SPECIFIER="${profile_uuid}" \
-  DEVELOPMENT_TEAM="${developer_team_id}"
+  -archivePath "${archive_path}"
 
 echo "Exporting IPA to '${export_path}'"
 xcodebuild -exportArchive \
