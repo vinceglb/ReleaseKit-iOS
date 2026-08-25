@@ -18,6 +18,7 @@ class ArchiveScriptTest < Minitest::Test
     @archive_path = File.join(@tmp, "Molkky.xcarchive")
     @export_path = File.join(@tmp, "export")
     @captured_export_options = File.join(@tmp, "ExportOptions.plist")
+    @captured_xcodebuild_commands = File.join(@tmp, "xcodebuild-commands")
     @outputs_path = File.join(@tmp, "outputs")
     FileUtils.mkdir_p([@runner_temp, @bin_dir, @workspace])
     write_archive_info_plist
@@ -28,13 +29,24 @@ class ArchiveScriptTest < Minitest::Test
     FileUtils.remove_entry(@tmp)
   end
 
-  def test_exports_locally_without_xcode_managing_the_build_number
+  def test_exports_locally_without_app_store_connect_access
     result = run_archive
 
     assert result[:status].success?, result[:stderr]
     export_options = File.read(@captured_export_options)
     assert_match(%r{<key>destination</key>\s*<string>export</string>}, export_options)
     assert_match(%r{<key>manageAppVersionAndBuildNumber</key>\s*<false\s*/>}, export_options)
+
+    commands = File.readlines(@captured_xcodebuild_commands, chomp: true)
+    archive_command = commands.find { |command| command.start_with?("archive ") }
+    export_command = commands.find { |command| command.start_with?("-exportArchive ") }
+
+    assert_includes archive_command, "-allowProvisioningUpdates"
+    assert_includes archive_command, "-authenticationKeyPath"
+    refute_includes export_command, "-allowProvisioningUpdates"
+    refute_includes export_command, "-authenticationKeyPath"
+    refute_includes export_command, "-authenticationKeyID"
+    refute_includes export_command, "-authenticationKeyIssuerID"
   end
 
   private
@@ -46,6 +58,7 @@ class ArchiveScriptTest < Minitest::Test
       "GITHUB_OUTPUT" => @outputs_path,
       "FAKE_ARCHIVE_INFO_PLIST" => File.join(@tmp, "ArchiveInfo.plist"),
       "FAKE_CAPTURED_EXPORT_OPTIONS" => @captured_export_options,
+      "FAKE_CAPTURED_XCODEBUILD_COMMANDS" => @captured_xcodebuild_commands,
       "INPUT_WORKSPACE" => @workspace,
       "INPUT_SCHEME" => "Molkky",
       "INPUT_BUNDLE_ID" => "io.github.vinceglb.molkky",
@@ -96,6 +109,8 @@ class ArchiveScriptTest < Minitest::Test
         done
         return 1
       }
+
+      printf '%s\n' "$*" >> "${FAKE_CAPTURED_XCODEBUILD_COMMANDS}"
 
       if [[ "${1:-}" == "archive" ]]; then
         archive_path="$(value_after -archivePath "$@")"

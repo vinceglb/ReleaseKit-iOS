@@ -106,11 +106,7 @@ echo "Exporting IPA to '${export_path}'"
 xcodebuild -exportArchive \
   -archivePath "${archive_path}" \
   -exportPath "${export_path}" \
-  -exportOptionsPlist "${export_options_path}" \
-  -allowProvisioningUpdates \
-  -authenticationKeyPath "${private_key_path}" \
-  -authenticationKeyID "${INPUT_ASC_KEY_ID}" \
-  -authenticationKeyIssuerID "${INPUT_ASC_ISSUER_ID}"
+  -exportOptionsPlist "${export_options_path}"
 
 ipa_path="$(find "${export_path}" -maxdepth 1 -type f -name '*.ipa' -print -quit)"
 if [[ -z "${ipa_path}" ]]; then
