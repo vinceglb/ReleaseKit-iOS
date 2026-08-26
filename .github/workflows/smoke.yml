@@ -10,7 +10,7 @@ on:
         default: archive-missing-bundle-id
         options:
           - archive-missing-bundle-id
-          - archive-invalid-key-b64
+          - archive-invalid-certificate-b64
           - upload-missing-source
           - upload-both-sources
           - split-happy-path
@@ -32,7 +32,7 @@ on:
         description: Expected bundle ID for split E2E scenarios.
         required: false
         default: ""
-      asc_team_id:
+      developer_team_id:
         description: Team ID for Xcode signing/export.
         required: false
         default: ""
@@ -40,14 +40,9 @@ on:
         description: Build configuration.
         required: false
         default: Release
-      xcodebuild_extra_args:
-        description: Extra xcodebuild archive args.
-        required: false
-        default: ""
-
 jobs:
   local-negative-tests:
-    if: ${{ inputs.scenario == 'archive-missing-bundle-id' || inputs.scenario == 'archive-invalid-key-b64' || inputs.scenario == 'upload-missing-source' || inputs.scenario == 'upload-both-sources' }}
+    if: ${{ inputs.scenario == 'archive-missing-bundle-id' || inputs.scenario == 'archive-invalid-certificate-b64' || inputs.scenario == 'upload-missing-source' || inputs.scenario == 'upload-both-sources' }}
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -67,14 +62,13 @@ jobs:
           INPUT_WORKSPACE: FakeApp.xcworkspace
           INPUT_SCHEME: FakeScheme
           INPUT_BUNDLE_ID: ""
-          INPUT_ASC_KEY_ID: KEYID123
-          INPUT_ASC_ISSUER_ID: ISSUER123
-          INPUT_ASC_PRIVATE_KEY_B64: Zm9v
-          INPUT_ASC_TEAM_ID: TEAM12345
+          INPUT_DISTRIBUTION_CERTIFICATE_P12_B64: Zm9v
+          INPUT_DISTRIBUTION_CERTIFICATE_PASSWORD: password
+          INPUT_PROVISIONING_PROFILE_B64: Zm9v
+          INPUT_DEVELOPER_TEAM_ID: TEAM12345
           INPUT_CONFIGURATION: Release
           INPUT_ARCHIVE_PATH: ${{ runner.temp }}/archive/App.xcarchive
           INPUT_EXPORT_PATH: ${{ runner.temp }}/export
-          INPUT_XCODEBUILD_EXTRA_ARGS: ""
 
       - name: Assert archive-missing-bundle-id failed
         if: ${{ inputs.scenario == 'archive-missing-bundle-id' }}
@@ -84,29 +78,28 @@ jobs:
             exit 1
           fi
 
-      - name: Scenario archive-invalid-key-b64
-        id: archive_invalid_key
-        if: ${{ inputs.scenario == 'archive-invalid-key-b64' }}
+      - name: Scenario archive-invalid-certificate-b64
+        id: archive_invalid_certificate
+        if: ${{ inputs.scenario == 'archive-invalid-certificate-b64' }}
         continue-on-error: true
         run: scripts/archive.sh
         env:
           INPUT_WORKSPACE: FakeApp.xcworkspace
           INPUT_SCHEME: FakeScheme
           INPUT_BUNDLE_ID: com.example.app
-          INPUT_ASC_KEY_ID: KEYID123
-          INPUT_ASC_ISSUER_ID: ISSUER123
-          INPUT_ASC_PRIVATE_KEY_B64: "###-NOT-BASE64-###"
-          INPUT_ASC_TEAM_ID: TEAM12345
+          INPUT_DISTRIBUTION_CERTIFICATE_P12_B64: "###-NOT-BASE64-###"
+          INPUT_DISTRIBUTION_CERTIFICATE_PASSWORD: password
+          INPUT_PROVISIONING_PROFILE_B64: Zm9v
+          INPUT_DEVELOPER_TEAM_ID: TEAM12345
           INPUT_CONFIGURATION: Release
           INPUT_ARCHIVE_PATH: ${{ runner.temp }}/archive/App.xcarchive
           INPUT_EXPORT_PATH: ${{ runner.temp }}/export
-          INPUT_XCODEBUILD_EXTRA_ARGS: ""
 
-      - name: Assert archive-invalid-key-b64 failed
-        if: ${{ inputs.scenario == 'archive-invalid-key-b64' }}
+      - name: Assert archive-invalid-certificate-b64 failed
+        if: ${{ inputs.scenario == 'archive-invalid-certificate-b64' }}
         run: |
-          if [[ "${{ steps.archive_invalid_key.outcome }}" != "failure" ]]; then
-            echo "Expected archive-invalid-key-b64 scenario to fail."
+          if [[ "${{ steps.archive_invalid_certificate.outcome }}" != "failure" ]]; then
+            echo "Expected archive-invalid-certificate-b64 scenario to fail."
             exit 1
           fi
 
@@ -172,12 +165,11 @@ jobs:
           workspace: ${{ inputs.workspace }}
           scheme: ${{ inputs.scheme }}
           bundle_id: ${{ inputs.scenario == 'split-bundle-mismatch' && format('{0}.mismatch', inputs.bundle_id) || inputs.bundle_id }}
-          asc_key_id: ${{ secrets.ASC_KEY_ID }}
-          asc_issuer_id: ${{ secrets.ASC_ISSUER_ID }}
-          asc_private_key_b64: ${{ secrets.ASC_PRIVATE_KEY_B64 }}
-          asc_team_id: ${{ inputs.asc_team_id }}
+          distribution_certificate_p12_b64: ${{ secrets.DISTRIBUTION_CERTIFICATE_P12_B64 }}
+          distribution_certificate_password: ${{ secrets.DISTRIBUTION_CERTIFICATE_PASSWORD }}
+          provisioning_profile_b64: ${{ secrets.PROVISIONING_PROFILE_B64 }}
+          developer_team_id: ${{ inputs.developer_team_id }}
           configuration: ${{ inputs.configuration }}
-          xcodebuild_extra_args: ${{ inputs.xcodebuild_extra_args }}
 
       - name: Assert archive scenario result
         run: |

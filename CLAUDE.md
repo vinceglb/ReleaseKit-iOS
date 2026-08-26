@@ -10,7 +10,7 @@ ReleaseKit-iOS is a GitHub Actions-based CI/CD toolkit for distributing iOS apps
 - **Bash scripts** (`scripts/`) that implement the archive, upload, and App Store update-release logic
 - **An installer script** (`install-cli.sh`) for end-user CLI installation
 
-The key design: App Store Connect API handles cloud signing, so no local certificates are needed.
+The key design: the archive action signs locally with an Apple Distribution `.p12` and App Store provisioning profile. App Store Connect API credentials belong only to upload and release actions.
 
 ## Commands
 

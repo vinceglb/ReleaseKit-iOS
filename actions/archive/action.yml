@@ -12,18 +12,21 @@ inputs:
   bundle_id:
     description: Expected app bundle identifier.
     required: true
-  asc_key_id:
-    description: App Store Connect API key ID.
+  distribution_certificate_p12_b64:
+    description: Base64-encoded Apple Distribution certificate and private key (.p12).
     required: true
-  asc_issuer_id:
-    description: App Store Connect API issuer ID.
+  distribution_certificate_password:
+    description: Password protecting the Apple Distribution .p12.
     required: true
-  asc_private_key_b64:
-    description: Base64-encoded contents of the App Store Connect private key (.p8).
+  provisioning_profile_b64:
+    description: Base64-encoded App Store provisioning profile (.mobileprovision).
     required: true
-  asc_team_id:
+  developer_team_id:
     description: Apple Developer Team ID used for signing/export.
-    required: true
+    required: false
+  asc_team_id:
+    description: Deprecated alias for developer_team_id.
+    required: false
   configuration:
     description: Xcode build configuration.
     required: false
@@ -36,11 +39,6 @@ inputs:
     description: Output directory for exported artifacts (.ipa).
     required: false
     default: ${{ runner.temp }}/export
-  xcodebuild_extra_args:
-    description: Additional args appended to xcodebuild archive command.
-    required: false
-    default: ""
-
 outputs:
   archive_path:
     description: Absolute path to generated .xcarchive.
@@ -63,11 +61,11 @@ runs:
         INPUT_WORKSPACE: ${{ inputs.workspace }}
         INPUT_SCHEME: ${{ inputs.scheme }}
         INPUT_BUNDLE_ID: ${{ inputs.bundle_id }}
-        INPUT_ASC_KEY_ID: ${{ inputs.asc_key_id }}
-        INPUT_ASC_ISSUER_ID: ${{ inputs.asc_issuer_id }}
-        INPUT_ASC_PRIVATE_KEY_B64: ${{ inputs.asc_private_key_b64 }}
+        INPUT_DISTRIBUTION_CERTIFICATE_P12_B64: ${{ inputs.distribution_certificate_p12_b64 }}
+        INPUT_DISTRIBUTION_CERTIFICATE_PASSWORD: ${{ inputs.distribution_certificate_password }}
+        INPUT_PROVISIONING_PROFILE_B64: ${{ inputs.provisioning_profile_b64 }}
+        INPUT_DEVELOPER_TEAM_ID: ${{ inputs.developer_team_id }}
         INPUT_ASC_TEAM_ID: ${{ inputs.asc_team_id }}
         INPUT_CONFIGURATION: ${{ inputs.configuration }}
         INPUT_ARCHIVE_PATH: ${{ inputs.archive_path }}
         INPUT_EXPORT_PATH: ${{ inputs.export_path }}
-        INPUT_XCODEBUILD_EXTRA_ARGS: ${{ inputs.xcodebuild_extra_args }}
